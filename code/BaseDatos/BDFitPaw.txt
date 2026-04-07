@@ -1,0 +1,127 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.entrenamiento_deportes_extra (
+  deporte_id integer NOT NULL DEFAULT nextval('entrenamiento_deportes_extra_deporte_id_seq'::regclass),
+  nombre character varying,
+  descripcion text,
+  url_icono character varying,
+  CONSTRAINT entrenamiento_deportes_extra_pkey PRIMARY KEY (deporte_id)
+);
+CREATE TABLE public.entrenamiento_ejercicios (
+  ejercicio_id integer NOT NULL DEFAULT nextval('entrenamiento_ejercicios_ejercicio_id_seq'::regclass),
+  nombre character varying NOT NULL,
+  grupo_muscular character varying,
+  descripcion text,
+  instrucciones_json text,
+  url_media character varying,
+  CONSTRAINT entrenamiento_ejercicios_pkey PRIMARY KEY (ejercicio_id)
+);
+CREATE TABLE public.mascota_catalogo_items (
+  item_id integer NOT NULL DEFAULT nextval('mascota_catalogo_items_item_id_seq'::regclass),
+  nombre character varying NOT NULL,
+  tipo character varying,
+  beneficio_puntos integer,
+  url_imagen character varying,
+  CONSTRAINT mascota_catalogo_items_pkey PRIMARY KEY (item_id)
+);
+CREATE TABLE public.mascota_estado (
+  mascota_id integer NOT NULL DEFAULT nextval('mascota_estado_mascota_id_seq'::regclass),
+  usuario_id integer,
+  nombre character varying NOT NULL,
+  nivel integer,
+  experiencia_actual integer,
+  hambre integer,
+  salud integer,
+  ultima_vez_alimentado timestamp without time zone,
+  CONSTRAINT mascota_estado_pkey PRIMARY KEY (mascota_id),
+  CONSTRAINT fk_mascota_usuario FOREIGN KEY (usuario_id) REFERENCES public.usuarios_cuenta(usuario_id)
+);
+CREATE TABLE public.mascota_inventario (
+  inventario_id integer NOT NULL DEFAULT nextval('mascota_inventario_inventario_id_seq'::regclass),
+  usuario_id integer,
+  item_id integer,
+  cantidad integer,
+  esta_equipado boolean,
+  CONSTRAINT mascota_inventario_pkey PRIMARY KEY (inventario_id),
+  CONSTRAINT mascota_inventario_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios_cuenta(usuario_id),
+  CONSTRAINT fk_item FOREIGN KEY (item_id) REFERENCES public.mascota_catalogo_items(item_id)
+);
+CREATE TABLE public.mascota_logros (
+  logro_id integer NOT NULL DEFAULT nextval('mascota_logros_logro_id_seq'::regclass),
+  nombre character varying,
+  tipo_condicion character varying,
+  valor_requerido integer,
+  recompensa_item_id integer,
+  CONSTRAINT mascota_logros_pkey PRIMARY KEY (logro_id),
+  CONSTRAINT mascota_logros_recompensa_item_id_fkey FOREIGN KEY (recompensa_item_id) REFERENCES public.mascota_catalogo_items(item_id)
+);
+CREATE TABLE public.progreso_bitacora_extra (
+  registro_extra_id integer NOT NULL DEFAULT nextval('progreso_bitacora_extra_registro_extra_id_seq'::regclass),
+  usuario_id integer,
+  deporte_id integer,
+  duracion_minutos integer,
+  fecha date,
+  CONSTRAINT progreso_bitacora_extra_pkey PRIMARY KEY (registro_extra_id),
+  CONSTRAINT progreso_bitacora_extra_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios_cuenta(usuario_id),
+  CONSTRAINT progreso_bitacora_extra_deporte_id_fkey FOREIGN KEY (deporte_id) REFERENCES public.entrenamiento_deportes_extra(deporte_id)
+);
+CREATE TABLE public.progreso_bitacora_fuerza (
+  registro_id integer NOT NULL DEFAULT nextval('progreso_bitacora_fuerza_registro_id_seq'::regclass),
+  usuario_id integer,
+  ejercicio_id integer,
+  serie_numero integer,
+  peso_kg numeric,
+  repeticiones integer,
+  fecha timestamp without time zone,
+  CONSTRAINT progreso_bitacora_fuerza_pkey PRIMARY KEY (registro_id),
+  CONSTRAINT progreso_bitacora_fuerza_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios_cuenta(usuario_id),
+  CONSTRAINT progreso_bitacora_fuerza_ejercicio_id_fkey FOREIGN KEY (ejercicio_id) REFERENCES public.entrenamiento_ejercicios(ejercicio_id)
+);
+CREATE TABLE public.progreso_historial_antropometrico (
+  registro_id integer NOT NULL DEFAULT nextval('progreso_historial_antropometrico_registro_id_seq'::regclass),
+  usuario_id integer,
+  peso numeric,
+  fecha timestamp without time zone,
+  CONSTRAINT progreso_historial_antropometrico_pkey PRIMARY KEY (registro_id),
+  CONSTRAINT progreso_historial_antropometrico_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios_cuenta(usuario_id)
+);
+CREATE TABLE public.progreso_rachas (
+  racha_id integer NOT NULL DEFAULT nextval('progreso_rachas_racha_id_seq'::regclass),
+  usuario_id integer,
+  conteo_dias integer,
+  ultima_fecha_actividad date,
+  CONSTRAINT progreso_rachas_pkey PRIMARY KEY (racha_id),
+  CONSTRAINT progreso_rachas_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios_cuenta(usuario_id)
+);
+CREATE TABLE public.progreso_rutinas_personalizadas (
+  rutina_id integer NOT NULL DEFAULT nextval('progreso_rutinas_personalizadas_rutina_id_seq'::regclass),
+  usuario_id integer,
+  nombre_rutina character varying,
+  dia_semana integer,
+  CONSTRAINT progreso_rutinas_personalizadas_pkey PRIMARY KEY (rutina_id),
+  CONSTRAINT progreso_rutinas_personalizadas_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios_cuenta(usuario_id)
+);
+CREATE TABLE public.usuarios_cuenta (
+  usuario_id integer NOT NULL DEFAULT nextval('usuarios_cuenta_usuario_id_seq'::regclass),
+  nickname character varying NOT NULL,
+  email character varying NOT NULL UNIQUE,
+  password character varying NOT NULL,
+  rol character varying NOT NULL,
+  genero character varying,
+  fecha_nacimiento date,
+  peso_actual numeric,
+  estatura_cm integer,
+  objetivo_principal character varying,
+  fecha_registro timestamp without time zone DEFAULT now(),
+  CONSTRAINT usuarios_cuenta_pkey PRIMARY KEY (usuario_id)
+);
+CREATE TABLE public.usuarios_fotos_progreso (
+  foto_id integer NOT NULL DEFAULT nextval('usuarios_fotos_progreso_foto_id_seq'::regclass),
+  usuario_id integer,
+  url_foto character varying,
+  posicion character varying,
+  fecha timestamp without time zone,
+  CONSTRAINT usuarios_fotos_progreso_pkey PRIMARY KEY (foto_id),
+  CONSTRAINT usuarios_fotos_progreso_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios_cuenta(usuario_id)
+);
