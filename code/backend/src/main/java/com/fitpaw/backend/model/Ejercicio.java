@@ -1,15 +1,14 @@
 package com.fitpaw.backend.model;
 
-import jakarta.websocket.Decoder.Text;
-
 public class Ejercicio {
 
-    int ejercicioId;
-    String nombre;
-    String grupoMuscular;
-    Text descripcion;
-    Text instruccionesJson;
-    String urlMedia;
+    private int ejercicioId;
+    private String nombre;
+    private String grupoMuscular;
+    private String descripcion;
+    private String instruccionesJson;
+    private String urlMedia;
+    private boolean activo;
 
     public Ejercicio() {}
 
@@ -37,19 +36,19 @@ public class Ejercicio {
         this.grupoMuscular = grupoMuscular;
     }
 
-    public Text getDescripcion() {
+    public String getDescripcion() {
         return descripcion;
     }
 
-    public void setDescripcion(Text descripcion) {
+    public void setDescripcion(String descripcion) {
         this.descripcion = descripcion;
     }
 
-    public Text getInstruccionesJson() {
+    public String getInstruccionesJson() {
         return instruccionesJson;
     }
 
-    public void setInstruccionesJson(Text instruccionesJson) {
+    public void setInstruccionesJson(String instruccionesJson) {
         this.instruccionesJson = instruccionesJson;
     }
 
@@ -59,6 +58,14 @@ public class Ejercicio {
 
     public void setUrlMedia(String urlMedia) {
         this.urlMedia = urlMedia;
+    }
+
+    public boolean isActivo() {
+        return activo;
+    }
+
+    public void setActivo(boolean activo) {
+        this.activo = activo;
     }
 
 }
