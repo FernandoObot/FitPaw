@@ -1,28 +1,35 @@
 package com.fitpaw.backend.service;
 
-import java.time.LocalDate;
-
 import org.springframework.stereotype.Service;
+
+import com.fitpaw.backend.model.HistorialAntropometrico;
+import com.fitpaw.backend.model.Racha;
 
 @Service
 public class ProgressService {
 
-    public int actualizarRacha(LocalDate ultimaFecha, int rachaActual) {
-        LocalDate hoy = LocalDate.now();
+    public Object calcularEstadisticas(int usuarioId) {
+        // Lógica para calcular estadísticas de progreso del usuario
+        return new Object(); // Valor simulado
+    }
 
-        // Racha sin romper
-        if (ultimaFecha != null && ultimaFecha.plusDays(1).equals(hoy)){
-            return rachaActual +1;
-        }
+    public boolean verificarRacha(int usuarioId) {
+        // Lógica para verificar si el usuario mantiene una racha de actividad
+        return true; // Valor simulado
+    }
 
-        // Racha sin cambio
-        if (ultimaFecha != null && ultimaFecha.equals(hoy)){
-            return rachaActual;
+    public Racha actualizarRacha(int usuarioId) {
+        // Lógica para actualizar la racha del usuario
+        return new Racha(); // Valor simulado
+    }
 
-        }
+    public HistorialAntropometrico[] getHistorialAntropometrico(int usuarioId) {
+        // Lógica para obtener el historial antropométrico del usuario
+        return new HistorialAntropometrico[0]; // Valor simulado
+    }
 
-        // Racha rota
-        return 1;
+    public void registrarPeso(int usuarioId, double peso) {
+        // Lógica para registrar el peso del usuario en el historial antropométrico
     }
 
 }

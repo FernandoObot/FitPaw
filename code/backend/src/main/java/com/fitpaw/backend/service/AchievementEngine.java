@@ -5,19 +5,21 @@ import org.springframework.stereotype.Service;
 @Service
 public class AchievementEngine {
 
-    public String verificarLogros(int racha, int experiencia) {
-        // Ejemplos de logros basados en racha y experiencia
-        // Logro 1: primer entrenamiento
-        if (experiencia > 0){
-            return "Logro desbloqueado: Primer entrenamiento";
-        }
+    public void verificarLogros(int usuarioId) {
+        // Lógica para verificar si el usuario ha cumplido con los requisitos de algún logro
+    }
 
-        // Logro 2: racha de 3 días
-        if (racha >= 3){
-            return "Logro desbloqueado: Racha de 3 días";
-        }
+    public void otorgarRecompesa(int usuarioId, int logroId) {
+        // Lógica para otorgar la recompensa asociada al logro
+    }
 
-        return null;// Sin logros desbloqueados
+    public void notificarLogro(int usuarioId, int logroId) {
+        // Lógica para notificar al usuario que ha desbloqueado un logro
+    }
+
+    private boolean checkCondicion(String tipo, int valor, int usuarioId) {
+        // Lógica para verificar si el usuario cumple con la condición específica del logro
+        return true; // Valor simulado
     }
 
 }

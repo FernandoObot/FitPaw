@@ -5,24 +5,28 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class PetService {
-    
-    public Pet actualizarEstado(Pet pet){
-        
-        // Simulación de tiempo → aumenta hambre
-        pet.setHambre(pet.getHambre() + 5);
 
-        // Si hambre alta → baja salud
-        if (pet.getHambre() > 70) {
-            pet.setSalud(pet.getSalud() - 10);
-        }
+    public int calcularHambre(int mascotaId) {
+        // Lógica para calcular el hambre de la mascota
+        return 50; // Valor simulado
+    }
 
-        // Subir nivel
-        if (pet.getExperienciaActual() >= 100) {
-            pet.setNivel(pet.getNivel() + 1);
-            pet.setExperienciaActual(0);
-        }
+    public int calcularSalud(int mascotaId) {
+        // Lógica para calcular la salud de la mascota
+        return 80; // Valor simulado
+    }
 
-        return pet;
+    public void subirNivel(int mascotraId) {
+        // Lógica para subir de nivel a la mascota
+    }
+
+    public Pet actualizarEstado(int mascotaId) {
+        // Lógica para actualizar el estado de la mascota
+        return new Pet(); // Valor simulado
+    }
+
+    public void alimentar(int mascotaId, int itemId) {
+        // Lógica para alimentar a la mascota
     }
 
 }
