@@ -8,6 +8,10 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Connection;
+
 import org.springframework.stereotype.Service;
 import com.fitpaw.backend.repository.ConexionDB;
 
@@ -37,7 +41,7 @@ public class StorageService {
             
             if (urlFoto != null) {
                 // Guardamos la URL en la base de datos
-                conexionDB.guardarUrlEnBaseDatos(usuarioId, urlFoto);
+                guardarUrlEnBaseDatos(usuarioId, urlFoto);
             }
             
             return urlFoto;
@@ -53,7 +57,7 @@ public class StorageService {
             String urlFoto = uploadToSupabase(BUCKET_NAME, rutaFoto, nombreArchivo);
             
             if (urlFoto != null) {
-                conexionDB.guardarUrlEnBaseDatos(usuarioId, urlFoto);
+                guardarUrlEnBaseDatos(usuarioId, urlFoto);
             }
             
             return urlFoto;
@@ -83,7 +87,7 @@ public class StorageService {
                     .uri(URI.create(uploadUrl))
                     .header("Authorization", "Bearer " + SUPABASE_KEY)
                     .header("apikey", SUPABASE_KEY)
-                    .header("Content-Type", "image/jpeg")
+                    .header("Content-Type", "image/jpg")
                     .POST(HttpRequest.BodyPublishers.ofByteArray(fileBytes))
                     .build();
 
@@ -107,31 +111,26 @@ public class StorageService {
          }
     }
 
-        private void guardarUrlEnBaseDatos(int usuarioId, String url) {
-
-         ConexionDB conexionDB = new ConexionDB();
-        StorageService storage = new StorageService(conexionDB);
-
-        // Ruta local de la imagen (ajusta según tu sistema)
-        String rutaImagenEnTuLinux = "/home/evelyn/Descargas/haruhi.jpg";
-
-        System.out.println(">>> Intentando subir la foto...");
-        String urlFotoSupabase = storage.subirFoto(usuarioId, rutaImagenEnTuLinux);
-
-        // Si la URL es null significa que falló, cancelamos la inserción a BD
-        if (urlFotoSupabase == null) {
-            System.err.println("No se pudo obtener la URL de la imagen. Inserción a base de datos cancelada.");
+    private void guardarUrlEnBaseDatos(int usuarioId, String url) {
+        if (url == null) {
+            System.err.println("URL nula: no se guardará en la base de datos.");
             return;
         }
 
-        System.out.println("¡URL obtenida con éxito!: " + urlFotoSupabase);
-        System.out.println(">>> Guardando la URL en la tabla prueba_eve ...");
-
-        // StorageService ya llama a conexionDB.guardarUrlEnBaseDatos(...) internamente,
-        // pero por claridad también podemos llamar explícitamente si queremos asegurarnos:
-        // conexionDB.guardarUrlEnBaseDatos(usuarioId, urlFotoSupabase);
-
-        System.out.println("Proceso completado.");
+        String sql = "INSERT INTO prueba_eve (\"Foto\") VALUES (?)";
+        try (Connection conn = conexionDB.conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, url);
+            int filasAfectadas = pstmt.executeUpdate();
+            if (filasAfectadas > 0) {
+                System.out.println("Registro insertado exitosamente en la tabla prueba_eve");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al guardar URL en BD:");
+            e.printStackTrace();
+        } finally {
+            conexionDB.desconectar();
+        }
     }
 
 }

@@ -2,7 +2,6 @@ package com.fitpaw.backend.repository;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.sql.PreparedStatement;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -17,7 +16,6 @@ public class ConexionDB {
     private Connection conexion;
 
     public ConexionDB() {
-        // Constructor por defecto
     }
 
     public Connection conectar() throws SQLException {
@@ -43,18 +41,4 @@ public class ConexionDB {
         }
     }
 
-    public void guardarUrlEnBaseDatos(int usuarioId, String urlFoto) {
-        String sql = "INSERT INTO prueba_eve (\"Foto\") VALUES (?)";
-        try (Connection conn = this.conectar();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, urlFoto);
-            int filasAfectadas = pstmt.executeUpdate();
-            if (filasAfectadas > 0) {
-                System.out.println("¡Registro insertado exitosamente en la tabla prueba_eve!");
-            }
-        } catch (SQLException e) {
-            System.err.println("Error al guardar URL en BD:");
-            e.printStackTrace();
-        }
-    }
 }
