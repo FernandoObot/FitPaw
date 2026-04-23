@@ -1,8 +1,12 @@
+package com.fitpaw.backend.repository;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.PreparedStatement;
+import org.springframework.stereotype.Repository;
 
-public class ConexionSupabase {
+@Repository
+public class ConexionDB {
     private static final String HOST = "db.qymbwyvmudplnyvwmkkp.supabase.co";
     private static final String DB = "postgres";
     private static final String USER = "postgres";
@@ -11,6 +15,10 @@ public class ConexionSupabase {
 
     private static final String URL = "jdbc:postgresql://" + HOST + ":" + PORT + "/" + DB;
     private Connection conexion;
+
+    public ConexionDB() {
+        // Constructor por defecto
+    }
 
     public Connection conectar() throws SQLException {
         try {
@@ -34,5 +42,19 @@ public class ConexionSupabase {
             e.printStackTrace();
         }
     }
-}
 
+    public void guardarUrlEnBaseDatos(int usuarioId, String urlFoto) {
+        String sql = "INSERT INTO prueba_eve (\"Foto\") VALUES (?)";
+        try (Connection conn = this.conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, urlFoto);
+            int filasAfectadas = pstmt.executeUpdate();
+            if (filasAfectadas > 0) {
+                System.out.println("¡Registro insertado exitosamente en la tabla prueba_eve!");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al guardar URL en BD:");
+            e.printStackTrace();
+        }
+    }
+}
