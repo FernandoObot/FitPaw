@@ -12,6 +12,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Connection;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.fitpaw.backend.repository.ConexionDB;
 
@@ -25,10 +26,14 @@ public class StorageService {
         this.conexionDB = conexionDB;
     }
 
-    // Configuración de Supabase
-    private static final String SUPABASE_URL = "https://qymbwyvmudplnyvwmkkp.supabase.co";
-    private static final String SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5bWJ3eXZtdWRwbG55dndta2twIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDc1Mjk1MiwiZXhwIjoyMDkwMzI4OTUyfQ.qwJGQE873b3jV7sLD2OoC17iXhRRHi0ilDwF8a3Z9Nc";
-    private static final String BUCKET_NAME = "Fotos";
+    @Value("${SUPABASE_URL}")
+    private String SUPABASE_URL;
+
+    @Value("${SUPABASE_KEY}")
+    private String SUPABASE_KEY;
+
+    @Value("${BUCKET_NAME}")
+    private String BUCKET_NAME;
 
    
     public String subirFotoProgreso(int usuarioId, String rutaFoto) {
@@ -53,7 +58,7 @@ public class StorageService {
 
     public String subirFoto(int usuarioId, String rutaFoto) {
         try {
-            String nombreArchivo = "foto_" + usuarioId + ".jpg";
+            String nombreArchivo = "FotoProgreso_" + usuarioId + System.currentTimeMillis() + ".jpg";
             String urlFoto = uploadToSupabase(BUCKET_NAME, rutaFoto, nombreArchivo);
             
             if (urlFoto != null) {
@@ -83,11 +88,11 @@ public class StorageService {
 
             // 3. Preparamos el cliente HTTP y la petición
             HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder()
+                HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(uploadUrl))
                     .header("Authorization", "Bearer " + SUPABASE_KEY)
                     .header("apikey", SUPABASE_KEY)
-                    .header("Content-Type", "image/jpg")
+                    .header("Content-Type", "image/jpeg")
                     .POST(HttpRequest.BodyPublishers.ofByteArray(fileBytes))
                     .build();
 

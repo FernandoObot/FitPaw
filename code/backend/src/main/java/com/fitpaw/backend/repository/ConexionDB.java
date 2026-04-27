@@ -1,27 +1,39 @@
 package com.fitpaw.backend.repository;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class ConexionDB {
-    private static final String HOST = "db.qymbwyvmudplnyvwmkkp.supabase.co";
-    private static final String DB = "postgres";
-    private static final String USER = "postgres";
-    private static final String PASSWORD = "JorgitoFitpat";
-    private static final String PORT = "5432";
 
-    private static final String URL = "jdbc:postgresql://" + HOST + ":" + PORT + "/" + DB;
+    @Value("${db.HOST}")
+    private String HOST;
+
+    @Value("${db.DB}")
+    private String DB;
+
+    @Value("${db.USER}")
+    private String USER;
+
+    @Value("${db.PASSWORD}")
+    private String PASSWORD;
+
+    @Value("${db.PORT}")
+    private String PORT;
+
     private Connection conexion;
 
     public ConexionDB() {
     }
 
     public Connection conectar() throws SQLException {
+        String url = "jdbc:postgresql://" + HOST + ":" + PORT + "/" + DB;
         try {
             Class.forName("org.postgresql.Driver");
-            conexion = DriverManager.getConnection(URL, USER, PASSWORD);
+            conexion = DriverManager.getConnection(url, USER, PASSWORD);
             System.out.println("Conectado a Supabase (FitPaw)");
         } catch (ClassNotFoundException e) {
             System.out.println("Driver no encontrado");
