@@ -7,6 +7,7 @@ public class User {
 
     private int usuarioId;
     private String nickname;
+    private String telefono;
     private String password;
     private String rol;
     private String genero;
@@ -33,6 +34,14 @@ public class User {
 
     public void setNickname(String nickname) {
         this.nickname = nickname;
+    }
+
+    public String getTelefono() {
+        return telefono;
+    }
+
+    public void setTelefono(String telefono) {
+        this.telefono = telefono;
     }
 
     public String getPassword() {
