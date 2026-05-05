@@ -8,6 +8,8 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -19,6 +21,7 @@ import com.fitpaw.backend.DTOs.RegisterRequest;
 import com.fitpaw.backend.DTOs.RegisterResponse;
 import com.fitpaw.backend.DTOs.TokenResponse;
 import com.fitpaw.backend.DTOs.UpdateProfileRequest;
+import com.fitpaw.backend.DTOs.EditProfileRequest;
 import com.fitpaw.backend.repository.ConexionDB;
 import com.fitpaw.backend.util.JwtUtil;
 
@@ -185,6 +188,70 @@ public class AuthService {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Error al actualizar el perfil: " + e.getMessage());
+        }
+    }
+
+    public void editProfile(int usuarioId, EditProfileRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("El body del perfil es obligatorio");
+        }
+
+        List<Object> params = new ArrayList<>();
+        StringBuilder sb = new StringBuilder("UPDATE public.usuarios_cuenta SET ");
+
+        if (request.getNombre() != null) {
+            String nombre = clean(request.getNombre());
+            if (nombre.isEmpty()) {
+                throw new IllegalArgumentException("El nombre no puede estar vacío");
+            }
+            sb.append("nickname = ?, ");
+            params.add(nombre);
+        }
+
+        if (request.getPeso() != null) {
+            sb.append("peso_actual = ?, ");
+            params.add(request.getPeso());
+        }
+
+        if (request.getEstatura() != null) {
+            sb.append("estatura_cm = ?, ");
+            params.add(request.getEstatura());
+        }
+
+        if (params.isEmpty()) {
+            throw new IllegalArgumentException("Al menos un campo a editar es obligatorio");
+        }
+
+        // remove trailing comma and space
+        int len = sb.length();
+        sb.delete(len - 2, len);
+        sb.append(" WHERE usuario_id = ?");
+        params.add(usuarioId);
+
+        try (Connection conn = conexionDB.conectar()) {
+            try (PreparedStatement ps = conn.prepareStatement(sb.toString())) {
+                for (int i = 0; i < params.size(); i++) {
+                    Object p = params.get(i);
+                    if (p instanceof String) {
+                        ps.setString(i + 1, (String) p);
+                    } else if (p instanceof Integer) {
+                        ps.setInt(i + 1, (Integer) p);
+                    } else if (p instanceof Double) {
+                        ps.setDouble(i + 1, (Double) p);
+                    } else if (p instanceof Float) {
+                        ps.setDouble(i + 1, ((Float) p).doubleValue());
+                    } else {
+                        ps.setObject(i + 1, p);
+                    }
+                }
+
+                int updated = ps.executeUpdate();
+                if (updated == 0) {
+                    throw new IllegalStateException("Usuario no encontrado");
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al editar el perfil: " + e.getMessage());
         }
     }
 }

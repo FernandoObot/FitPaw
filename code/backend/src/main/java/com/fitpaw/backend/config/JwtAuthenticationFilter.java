@@ -35,10 +35,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
 
-            if (!jwtUtil.isTokenValid(token)) {
+            try {
+                if (!jwtUtil.isTokenValid(token)) {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"mensaje\":\"Token invalido o expirado\"}");
+                    return;
+                }
+            } catch (com.auth0.jwt.exceptions.JWTVerificationException ex) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.setContentType("application/json");
-                response.getWriter().write("{\"mensaje\":\"Token invalido o expirado\"}");
+                response.setContentType("application/json;charset=UTF-8");
+                String msg = ex.getMessage() != null ? ex.getMessage().replaceAll("\"","\\\"") : "Token invalido o expirado";
+                response.getWriter().write("{\"mensaje\":\"Token invalido o expirado: " + msg + "\"}");
                 return;
             }
 
