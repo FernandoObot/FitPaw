@@ -6,7 +6,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.time.LocalDate;
 import java.util.regex.Pattern;
 import java.util.ArrayList;
 import java.util.List;
