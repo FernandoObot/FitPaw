@@ -1,50 +1,484 @@
 package com.fitpaw.backend.service;
 
+import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.NoSuchElementException;
 
 import org.springframework.stereotype.Service;
 
+import com.fitpaw.backend.DTOs.CreateEjercicioRequest;
 import com.fitpaw.backend.DTOs.EjercicioCatalogoResponse;
 import com.fitpaw.backend.DTOs.EstadisticasResponse;
 import com.fitpaw.backend.DTOs.OperacionResponse;
+import com.fitpaw.backend.DTOs.RegistroCorrerRequest;
+import com.fitpaw.backend.DTOs.RegistroCorrerResponse;
+import com.fitpaw.backend.DTOs.SerieFuerzaResponse;
 import com.fitpaw.backend.DTOs.CumplimientoMetaRequest;
 import com.fitpaw.backend.DTOs.RegistrarDeporteExtraRequest;
 import com.fitpaw.backend.DTOs.RegistrarSerieRequest;
+import com.fitpaw.backend.DTOs.UpdateEjercicioRequest;
 import com.fitpaw.backend.model.MetaUsuario;
 import com.fitpaw.backend.model.RegistroActividad;
 import com.fitpaw.backend.model.Racha;
+import com.fitpaw.backend.repository.ConexionDB;
 
 @Service
 public class TrainingAppService {
 
+    private static final String CORRER_NOMBRE = "Correr";
+    private static final String DIFICULTAD_PREFIX = "DIFICULTAD:";
+
+    private final ConexionDB conexionDB;
     private final MetaEvaluacionService metaEvaluacionService;
 
-    public TrainingAppService(MetaEvaluacionService metaEvaluacionService) {
+    public TrainingAppService(ConexionDB conexionDB, MetaEvaluacionService metaEvaluacionService) {
+        this.conexionDB = conexionDB;
         this.metaEvaluacionService = metaEvaluacionService;
     }
 
     public OperacionResponse registrarSerie(RegistrarSerieRequest request) {
+        SerieFuerzaResponse creada = crearRegistroFuerza(request);
         return new OperacionResponse(
                 "ok",
                 "POST /training/series",
-                "Stub listo para registrar serie de fuerza"
+                "Serie registrada con id " + creada.getRegistroId()
         );
     }
 
     public OperacionResponse registrarDeporteExtra(RegistrarDeporteExtraRequest request) {
+        RegistroCorrerRequest correrRequest = new RegistroCorrerRequest();
+        correrRequest.setUsuarioId(request.getUsuarioId());
+        correrRequest.setDificultad(request.getDificultad());
+        correrRequest.setTiempoCorridoMinutos(request.getTiempoCorridoMinutos());
+        correrRequest.setFecha(request.getFecha());
+
+        RegistroCorrerResponse creada = crearRegistroCorrer(correrRequest);
         return new OperacionResponse(
                 "ok",
                 "POST /training/deporte-extra",
-                "Stub listo para registrar deporte extra"
+                "Registro de correr creado con id " + creada.getRegistroExtraId()
         );
     }
 
     public List<EjercicioCatalogoResponse> getCatalogoEjercicios() {
-        return List.of();
+        try (Connection conn = conexionDB.conectar()) {
+            String sql = "SELECT ejercicio_id, nombre, grupo_muscular, descripcion, url_media "
+                    + "FROM public.entrenamiento_ejercicios ORDER BY ejercicio_id";
+            try (PreparedStatement ps = conn.prepareStatement(sql);
+                 ResultSet rs = ps.executeQuery()) {
+                List<EjercicioCatalogoResponse> out = new ArrayList<>();
+                while (rs.next()) {
+                    out.add(mapEjercicio(rs));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al consultar ejercicios: " + e.getMessage());
+        }
     }
 
     public EstadisticasResponse getEstadisticas(int usuarioId) {
-        return new EstadisticasResponse(0, 0, List.of());
+        validarUsuarioId(usuarioId);
+
+        try (Connection conn = conexionDB.conectar()) {
+            validarUsuarioExiste(conn, usuarioId);
+
+            int rachaActual = 0;
+            String sqlRacha = "SELECT conteo_dias FROM public.progreso_rachas "
+                    + "WHERE usuario_id = ? ORDER BY racha_id DESC LIMIT 1";
+            try (PreparedStatement ps = conn.prepareStatement(sqlRacha)) {
+                ps.setInt(1, usuarioId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        rachaActual = rs.getInt("conteo_dias");
+                    }
+                }
+            }
+
+            int volumenTotal = 0;
+            String sqlVolumen = "SELECT COALESCE(SUM(peso_kg * repeticiones), 0) AS volumen "
+                    + "FROM public.progreso_bitacora_fuerza WHERE usuario_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sqlVolumen)) {
+                ps.setInt(1, usuarioId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        volumenTotal = (int) Math.round(rs.getDouble("volumen"));
+                    }
+                }
+            }
+
+            List<String> prs = new ArrayList<>();
+            String sqlPrs = "SELECT e.nombre, MAX(b.peso_kg) AS max_peso "
+                    + "FROM public.progreso_bitacora_fuerza b "
+                    + "JOIN public.entrenamiento_ejercicios e ON e.ejercicio_id = b.ejercicio_id "
+                    + "WHERE b.usuario_id = ? "
+                    + "GROUP BY e.nombre "
+                    + "ORDER BY max_peso DESC LIMIT 5";
+            try (PreparedStatement ps = conn.prepareStatement(sqlPrs)) {
+                ps.setInt(1, usuarioId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        prs.add(rs.getString("nombre") + ": " + rs.getDouble("max_peso") + " kg");
+                    }
+                }
+            }
+
+            return new EstadisticasResponse(rachaActual, volumenTotal, prs);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al consultar estadisticas: " + e.getMessage());
+        }
+    }
+
+    public EjercicioCatalogoResponse crearEjercicio(CreateEjercicioRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("El body para crear ejercicio es obligatorio");
+        }
+
+        String nombre = clean(request.getNombre());
+        if (nombre.isEmpty()) {
+            throw new IllegalArgumentException("El nombre del ejercicio es obligatorio");
+        }
+
+        try (Connection conn = conexionDB.conectar()) {
+            String sql = "INSERT INTO public.entrenamiento_ejercicios "
+                    + "(nombre, grupo_muscular, descripcion, instrucciones_json, url_media) "
+                    + "VALUES (?, ?, ?, ?, ?) "
+                    + "RETURNING ejercicio_id, nombre, grupo_muscular, descripcion, url_media";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, nombre);
+                ps.setString(2, nullableTrim(request.getGrupoMuscular()));
+                ps.setString(3, nullableTrim(request.getDescripcion()));
+                ps.setString(4, nullableTrim(request.getInstruccionesJson()));
+                ps.setString(5, nullableTrim(request.getUrlMedia()));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return mapEjercicio(rs);
+                    }
+                }
+            }
+            throw new IllegalStateException("No fue posible crear el ejercicio");
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al crear ejercicio: " + e.getMessage());
+        }
+    }
+
+    public EjercicioCatalogoResponse getEjercicioById(int ejercicioId) {
+        validarId(ejercicioId, "ejercicioId");
+        try (Connection conn = conexionDB.conectar()) {
+            String sql = "SELECT ejercicio_id, nombre, grupo_muscular, descripcion, url_media "
+                    + "FROM public.entrenamiento_ejercicios WHERE ejercicio_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, ejercicioId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return mapEjercicio(rs);
+                    }
+                }
+            }
+            throw new NoSuchElementException("No existe el ejercicio con id " + ejercicioId);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al consultar ejercicio: " + e.getMessage());
+        }
+    }
+
+    public EjercicioCatalogoResponse actualizarEjercicio(int ejercicioId, UpdateEjercicioRequest request) {
+        validarId(ejercicioId, "ejercicioId");
+        if (request == null) {
+            throw new IllegalArgumentException("El body para actualizar ejercicio es obligatorio");
+        }
+
+        String nombre = clean(request.getNombre());
+        if (nombre.isEmpty()) {
+            throw new IllegalArgumentException("El nombre del ejercicio es obligatorio");
+        }
+
+        try (Connection conn = conexionDB.conectar()) {
+            validarEjercicioExiste(conn, ejercicioId);
+
+            String sql = "UPDATE public.entrenamiento_ejercicios "
+                    + "SET nombre = ?, grupo_muscular = ?, descripcion = ?, instrucciones_json = ?, url_media = ? "
+                    + "WHERE ejercicio_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, nombre);
+                ps.setString(2, nullableTrim(request.getGrupoMuscular()));
+                ps.setString(3, nullableTrim(request.getDescripcion()));
+                ps.setString(4, nullableTrim(request.getInstruccionesJson()));
+                ps.setString(5, nullableTrim(request.getUrlMedia()));
+                ps.setInt(6, ejercicioId);
+                ps.executeUpdate();
+            }
+
+            return getEjercicioById(ejercicioId);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al actualizar ejercicio: " + e.getMessage());
+        }
+    }
+
+    public void eliminarEjercicio(int ejercicioId) {
+        validarId(ejercicioId, "ejercicioId");
+        try (Connection conn = conexionDB.conectar()) {
+            validarEjercicioExiste(conn, ejercicioId);
+
+            String sql = "DELETE FROM public.entrenamiento_ejercicios WHERE ejercicio_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, ejercicioId);
+                ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al eliminar ejercicio: " + e.getMessage());
+        }
+    }
+
+    public SerieFuerzaResponse crearRegistroFuerza(RegistrarSerieRequest request) {
+        validarRequestSerie(request);
+        try (Connection conn = conexionDB.conectar()) {
+            validarUsuarioExiste(conn, request.getUsuarioId());
+            validarEjercicioExiste(conn, request.getEjercicioId());
+
+            String sql = "INSERT INTO public.progreso_bitacora_fuerza "
+                    + "(usuario_id, ejercicio_id, serie_numero, peso_kg, repeticiones, fecha) "
+                    + "VALUES (?, ?, ?, ?, ?, ?) RETURNING registro_id";
+            int registroId;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, request.getUsuarioId());
+                ps.setInt(2, request.getEjercicioId());
+                ps.setInt(3, request.getSerieNumero());
+                ps.setDouble(4, request.getPeso());
+                ps.setInt(5, request.getRepeticiones());
+                ps.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        throw new IllegalStateException("No se pudo crear registro de fuerza");
+                    }
+                    registroId = rs.getInt("registro_id");
+                }
+            }
+
+            return obtenerRegistroFuerza(registroId);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al crear registro de fuerza: " + e.getMessage());
+        }
+    }
+
+    public SerieFuerzaResponse obtenerRegistroFuerza(int registroId) {
+        validarId(registroId, "registroId");
+        try (Connection conn = conexionDB.conectar()) {
+            String sql = "SELECT b.registro_id, b.usuario_id, b.ejercicio_id, e.nombre AS ejercicio_nombre, "
+                    + "b.serie_numero, b.repeticiones, b.peso_kg, b.fecha "
+                    + "FROM public.progreso_bitacora_fuerza b "
+                    + "JOIN public.entrenamiento_ejercicios e ON e.ejercicio_id = b.ejercicio_id "
+                    + "WHERE b.registro_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, registroId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return mapSerie(rs);
+                    }
+                }
+            }
+            throw new NoSuchElementException("No existe el registro de fuerza con id " + registroId);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al consultar registro de fuerza: " + e.getMessage());
+        }
+    }
+
+    public List<SerieFuerzaResponse> listarRegistrosFuerzaPorUsuario(int usuarioId) {
+        validarUsuarioId(usuarioId);
+        try (Connection conn = conexionDB.conectar()) {
+            validarUsuarioExiste(conn, usuarioId);
+
+            String sql = "SELECT b.registro_id, b.usuario_id, b.ejercicio_id, e.nombre AS ejercicio_nombre, "
+                    + "b.serie_numero, b.repeticiones, b.peso_kg, b.fecha "
+                    + "FROM public.progreso_bitacora_fuerza b "
+                    + "JOIN public.entrenamiento_ejercicios e ON e.ejercicio_id = b.ejercicio_id "
+                    + "WHERE b.usuario_id = ? ORDER BY b.fecha DESC, b.registro_id DESC";
+
+            List<SerieFuerzaResponse> out = new ArrayList<>();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, usuarioId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.add(mapSerie(rs));
+                    }
+                }
+            }
+            return out;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al listar registros de fuerza: " + e.getMessage());
+        }
+    }
+
+    public SerieFuerzaResponse actualizarRegistroFuerza(int registroId, RegistrarSerieRequest request) {
+        validarId(registroId, "registroId");
+        validarRequestSerie(request);
+        try (Connection conn = conexionDB.conectar()) {
+            validarRegistroFuerzaExiste(conn, registroId);
+            validarUsuarioExiste(conn, request.getUsuarioId());
+            validarEjercicioExiste(conn, request.getEjercicioId());
+
+            String sql = "UPDATE public.progreso_bitacora_fuerza "
+                    + "SET usuario_id = ?, ejercicio_id = ?, serie_numero = ?, peso_kg = ?, repeticiones = ?, fecha = ? "
+                    + "WHERE registro_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, request.getUsuarioId());
+                ps.setInt(2, request.getEjercicioId());
+                ps.setInt(3, request.getSerieNumero());
+                ps.setDouble(4, request.getPeso());
+                ps.setInt(5, request.getRepeticiones());
+                ps.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
+                ps.setInt(7, registroId);
+                ps.executeUpdate();
+            }
+            return obtenerRegistroFuerza(registroId);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al actualizar registro de fuerza: " + e.getMessage());
+        }
+    }
+
+    public void eliminarRegistroFuerza(int registroId) {
+        validarId(registroId, "registroId");
+        try (Connection conn = conexionDB.conectar()) {
+            validarRegistroFuerzaExiste(conn, registroId);
+            String sql = "DELETE FROM public.progreso_bitacora_fuerza WHERE registro_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, registroId);
+                ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al eliminar registro de fuerza: " + e.getMessage());
+        }
+    }
+
+    public RegistroCorrerResponse crearRegistroCorrer(RegistroCorrerRequest request) {
+        validarRequestCorrer(request);
+        String dificultad = normalizarDificultad(request.getDificultad());
+
+        try (Connection conn = conexionDB.conectar()) {
+            validarUsuarioExiste(conn, request.getUsuarioId());
+            int deporteId = obtenerOCrearDeporteCorrer(conn, dificultad);
+
+            String sql = "INSERT INTO public.progreso_bitacora_extra "
+                    + "(usuario_id, deporte_id, duracion_minutos, fecha) "
+                    + "VALUES (?, ?, ?, ?) RETURNING registro_extra_id";
+
+            int registroId;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, request.getUsuarioId());
+                ps.setInt(2, deporteId);
+                ps.setInt(3, request.getTiempoCorridoMinutos());
+                ps.setDate(4, Date.valueOf(request.getFecha() != null ? request.getFecha() : LocalDate.now()));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        throw new IllegalStateException("No se pudo crear registro de correr");
+                    }
+                    registroId = rs.getInt("registro_extra_id");
+                }
+            }
+            return obtenerRegistroCorrer(registroId);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al crear registro de correr: " + e.getMessage());
+        }
+    }
+
+    public RegistroCorrerResponse obtenerRegistroCorrer(int registroExtraId) {
+        validarId(registroExtraId, "registroExtraId");
+        try (Connection conn = conexionDB.conectar()) {
+            String sql = "SELECT b.registro_extra_id, b.usuario_id, b.deporte_id, b.duracion_minutos, b.fecha, "
+                    + "d.descripcion "
+                    + "FROM public.progreso_bitacora_extra b "
+                    + "JOIN public.entrenamiento_deportes_extra d ON d.deporte_id = b.deporte_id "
+                    + "WHERE b.registro_extra_id = ? AND d.nombre = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, registroExtraId);
+                ps.setString(2, CORRER_NOMBRE);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return mapCorrer(rs);
+                    }
+                }
+            }
+            throw new NoSuchElementException("No existe el registro de correr con id " + registroExtraId);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al consultar registro de correr: " + e.getMessage());
+        }
+    }
+
+    public List<RegistroCorrerResponse> listarRegistrosCorrerPorUsuario(int usuarioId) {
+        validarUsuarioId(usuarioId);
+        try (Connection conn = conexionDB.conectar()) {
+            validarUsuarioExiste(conn, usuarioId);
+
+            String sql = "SELECT b.registro_extra_id, b.usuario_id, b.deporte_id, b.duracion_minutos, b.fecha, d.descripcion "
+                    + "FROM public.progreso_bitacora_extra b "
+                    + "JOIN public.entrenamiento_deportes_extra d ON d.deporte_id = b.deporte_id "
+                    + "WHERE b.usuario_id = ? AND d.nombre = ? "
+                    + "ORDER BY b.fecha DESC, b.registro_extra_id DESC";
+
+            List<RegistroCorrerResponse> out = new ArrayList<>();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, usuarioId);
+                ps.setString(2, CORRER_NOMBRE);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.add(mapCorrer(rs));
+                    }
+                }
+            }
+            return out;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al listar registros de correr: " + e.getMessage());
+        }
+    }
+
+    public RegistroCorrerResponse actualizarRegistroCorrer(int registroExtraId, RegistroCorrerRequest request) {
+        validarId(registroExtraId, "registroExtraId");
+        validarRequestCorrer(request);
+        String dificultad = normalizarDificultad(request.getDificultad());
+
+        try (Connection conn = conexionDB.conectar()) {
+            validarRegistroCorrerExiste(conn, registroExtraId);
+            validarUsuarioExiste(conn, request.getUsuarioId());
+            int deporteId = obtenerOCrearDeporteCorrer(conn, dificultad);
+
+            String sql = "UPDATE public.progreso_bitacora_extra "
+                    + "SET usuario_id = ?, deporte_id = ?, duracion_minutos = ?, fecha = ? "
+                    + "WHERE registro_extra_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, request.getUsuarioId());
+                ps.setInt(2, deporteId);
+                ps.setInt(3, request.getTiempoCorridoMinutos());
+                ps.setDate(4, Date.valueOf(request.getFecha() != null ? request.getFecha() : LocalDate.now()));
+                ps.setInt(5, registroExtraId);
+                ps.executeUpdate();
+            }
+
+            return obtenerRegistroCorrer(registroExtraId);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al actualizar registro de correr: " + e.getMessage());
+        }
+    }
+
+    public void eliminarRegistroCorrer(int registroExtraId) {
+        validarId(registroExtraId, "registroExtraId");
+        try (Connection conn = conexionDB.conectar()) {
+            validarRegistroCorrerExiste(conn, registroExtraId);
+            String sql = "DELETE FROM public.progreso_bitacora_extra WHERE registro_extra_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, registroExtraId);
+                ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al eliminar registro de correr: " + e.getMessage());
+        }
     }
 
     public OperacionResponse procesarCumplimientoMeta(CumplimientoMetaRequest request) {
@@ -83,5 +517,209 @@ public class TrainingAppService {
                 "POST /training/cumplimiento-meta",
                 "Meta cumplida. Racha actual: " + racha.getConteoDias() + ". Recompensa: " + recompensa
         );
+    }
+
+    private void validarRequestSerie(RegistrarSerieRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("El body de serie de fuerza es obligatorio");
+        }
+        validarUsuarioId(request.getUsuarioId());
+        validarId(request.getEjercicioId(), "ejercicioId");
+        if (request.getSerieNumero() <= 0) {
+            throw new IllegalArgumentException("serieNumero debe ser mayor a 0");
+        }
+        if (!repeticionesValidas(request.getRepeticiones())) {
+            throw new IllegalArgumentException("Las repeticiones deben estar en los rangos: 4-8, 8-12 o 12-16");
+        }
+        if (request.getPeso() < 0 || request.getPeso() > 25) {
+            throw new IllegalArgumentException("El peso debe estar entre 0 y 25 kg");
+        }
+    }
+
+    private void validarRequestCorrer(RegistroCorrerRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("El body para correr es obligatorio");
+        }
+        validarUsuarioId(request.getUsuarioId());
+        normalizarDificultad(request.getDificultad());
+        if (request.getTiempoCorridoMinutos() <= 0) {
+            throw new IllegalArgumentException("El tiempo corrido debe ser mayor a 0");
+        }
+    }
+
+    private void validarUsuarioId(int usuarioId) {
+        if (usuarioId <= 0) {
+            throw new IllegalArgumentException("usuarioId invalido");
+        }
+    }
+
+    private void validarId(int id, String nombreCampo) {
+        if (id <= 0) {
+            throw new IllegalArgumentException(nombreCampo + " invalido");
+        }
+    }
+
+    private boolean repeticionesValidas(int repeticiones) {
+        return (repeticiones >= 4 && repeticiones <= 8)
+                || (repeticiones >= 8 && repeticiones <= 12)
+                || (repeticiones >= 12 && repeticiones <= 16);
+    }
+
+    private String normalizarDificultad(String dificultad) {
+        String value = clean(dificultad).toLowerCase(Locale.ROOT)
+                .replace('á', 'a')
+                .replace('é', 'e')
+                .replace('í', 'i')
+                .replace('ó', 'o')
+                .replace('ú', 'u');
+
+        if (value.equals("facil")) {
+            return "Facil";
+        }
+        if (value.equals("media")) {
+            return "Media";
+        }
+        if (value.equals("dificil")) {
+            return "Dificil";
+        }
+        throw new IllegalArgumentException("Dificultad invalida. Opciones: Facil, Media, Dificil");
+    }
+
+    private int obtenerOCrearDeporteCorrer(Connection conn, String dificultad) throws SQLException {
+        String desc = DIFICULTAD_PREFIX + dificultad;
+
+        String buscar = "SELECT deporte_id FROM public.entrenamiento_deportes_extra "
+                + "WHERE nombre = ? AND descripcion = ? LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(buscar)) {
+            ps.setString(1, CORRER_NOMBRE);
+            ps.setString(2, desc);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("deporte_id");
+                }
+            }
+        }
+
+        String insert = "INSERT INTO public.entrenamiento_deportes_extra (nombre, descripcion) "
+                + "VALUES (?, ?) RETURNING deporte_id";
+        try (PreparedStatement ps = conn.prepareStatement(insert)) {
+            ps.setString(1, CORRER_NOMBRE);
+            ps.setString(2, desc);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("deporte_id");
+                }
+            }
+        }
+
+        throw new IllegalStateException("No fue posible resolver deporte_id para correr");
+    }
+
+    private void validarUsuarioExiste(Connection conn, int usuarioId) throws SQLException {
+        String sql = "SELECT 1 FROM public.usuarios_cuenta WHERE usuario_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, usuarioId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new NoSuchElementException("No existe usuario con id " + usuarioId);
+                }
+            }
+        }
+    }
+
+    private void validarEjercicioExiste(Connection conn, int ejercicioId) throws SQLException {
+        String sql = "SELECT 1 FROM public.entrenamiento_ejercicios WHERE ejercicio_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, ejercicioId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new NoSuchElementException("No existe ejercicio con id " + ejercicioId);
+                }
+            }
+        }
+    }
+
+    private void validarRegistroFuerzaExiste(Connection conn, int registroId) throws SQLException {
+        String sql = "SELECT 1 FROM public.progreso_bitacora_fuerza WHERE registro_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, registroId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new NoSuchElementException("No existe registro de fuerza con id " + registroId);
+                }
+            }
+        }
+    }
+
+    private void validarRegistroCorrerExiste(Connection conn, int registroId) throws SQLException {
+        String sql = "SELECT 1 "
+                + "FROM public.progreso_bitacora_extra b "
+                + "JOIN public.entrenamiento_deportes_extra d ON d.deporte_id = b.deporte_id "
+                + "WHERE b.registro_extra_id = ? AND d.nombre = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, registroId);
+            ps.setString(2, CORRER_NOMBRE);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new NoSuchElementException("No existe registro de correr con id " + registroId);
+                }
+            }
+        }
+    }
+
+    private EjercicioCatalogoResponse mapEjercicio(ResultSet rs) throws SQLException {
+        return new EjercicioCatalogoResponse(
+                rs.getInt("ejercicio_id"),
+                rs.getString("nombre"),
+                rs.getString("grupo_muscular"),
+                rs.getString("descripcion"),
+                rs.getString("url_media")
+        );
+    }
+
+    private SerieFuerzaResponse mapSerie(ResultSet rs) throws SQLException {
+        SerieFuerzaResponse out = new SerieFuerzaResponse();
+        out.setRegistroId(rs.getInt("registro_id"));
+        out.setUsuarioId(rs.getInt("usuario_id"));
+        out.setEjercicioId(rs.getInt("ejercicio_id"));
+        out.setEjercicioNombre(rs.getString("ejercicio_nombre"));
+        out.setSerieNumero(rs.getInt("serie_numero"));
+        out.setRepeticiones(rs.getInt("repeticiones"));
+        out.setPesoKg(rs.getDouble("peso_kg"));
+        Timestamp ts = rs.getTimestamp("fecha");
+        if (ts != null) {
+            out.setFecha(ts.toLocalDateTime());
+        }
+        return out;
+    }
+
+    private RegistroCorrerResponse mapCorrer(ResultSet rs) throws SQLException {
+        RegistroCorrerResponse out = new RegistroCorrerResponse();
+        out.setRegistroExtraId(rs.getInt("registro_extra_id"));
+        out.setUsuarioId(rs.getInt("usuario_id"));
+        out.setDeporteId(rs.getInt("deporte_id"));
+        out.setTiempoCorridoMinutos(rs.getInt("duracion_minutos"));
+
+        Date fecha = rs.getDate("fecha");
+        if (fecha != null) {
+            out.setFecha(fecha.toLocalDate());
+        }
+
+        String descripcion = clean(rs.getString("descripcion"));
+        if (descripcion.startsWith(DIFICULTAD_PREFIX)) {
+            out.setDificultad(descripcion.substring(DIFICULTAD_PREFIX.length()));
+        } else {
+            out.setDificultad("Media");
+        }
+        return out;
+    }
+
+    private String clean(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String nullableTrim(String value) {
+        String cleaned = clean(value);
+        return cleaned.isEmpty() ? null : cleaned;
     }
 }

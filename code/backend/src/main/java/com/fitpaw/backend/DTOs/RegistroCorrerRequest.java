@@ -2,14 +2,15 @@ package com.fitpaw.backend.DTOs;
 
 import java.time.LocalDate;
 
-public class RegistrarDeporteExtraRequest {
+public class RegistroCorrerRequest {
 
     private int usuarioId;
     private String dificultad;
     private int tiempoCorridoMinutos;
     private LocalDate fecha;
 
-    public RegistrarDeporteExtraRequest() {}
+    public RegistroCorrerRequest() {
+    }
 
     public int getUsuarioId() {
         return usuarioId;
@@ -42,5 +43,4 @@ public class RegistrarDeporteExtraRequest {
     public void setFecha(LocalDate fecha) {
         this.fecha = fecha;
     }
-
 }
