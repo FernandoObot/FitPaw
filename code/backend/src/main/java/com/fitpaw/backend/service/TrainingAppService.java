@@ -263,6 +263,7 @@ public class TrainingAppService {
                 }
             }
 
+            guardarRepeticionesEnEjercicio(conn, request.getEjercicioId(), request.getRepeticiones());
             return obtenerRegistroFuerza(registroId);
         } catch (SQLException e) {
             throw new IllegalStateException("Error al crear registro de fuerza: " + e.getMessage());
@@ -273,7 +274,7 @@ public class TrainingAppService {
         validarId(registroId, "registroId");
         try (Connection conn = conexionDB.conectar()) {
             String sql = "SELECT b.registro_id, b.usuario_id, b.ejercicio_id, e.nombre AS ejercicio_nombre, "
-                    + "b.serie_numero, b.repeticiones, b.peso_kg, b.fecha "
+                    + "b.serie_numero, b.repeticiones, b.peso_kg, b.fecha, e.instrucciones_json "
                     + "FROM public.progreso_bitacora_fuerza b "
                     + "JOIN public.entrenamiento_ejercicios e ON e.ejercicio_id = b.ejercicio_id "
                     + "WHERE b.registro_id = ?";
@@ -297,7 +298,7 @@ public class TrainingAppService {
             validarUsuarioExiste(conn, usuarioId);
 
             String sql = "SELECT b.registro_id, b.usuario_id, b.ejercicio_id, e.nombre AS ejercicio_nombre, "
-                    + "b.serie_numero, b.repeticiones, b.peso_kg, b.fecha "
+                    + "b.serie_numero, b.repeticiones, b.peso_kg, b.fecha, e.instrucciones_json "
                     + "FROM public.progreso_bitacora_fuerza b "
                     + "JOIN public.entrenamiento_ejercicios e ON e.ejercicio_id = b.ejercicio_id "
                     + "WHERE b.usuario_id = ? ORDER BY b.fecha DESC, b.registro_id DESC";
@@ -338,6 +339,7 @@ public class TrainingAppService {
                 ps.setInt(7, registroId);
                 ps.executeUpdate();
             }
+            guardarRepeticionesEnEjercicio(conn, request.getEjercicioId(), request.getRepeticiones());
             return obtenerRegistroFuerza(registroId);
         } catch (SQLException e) {
             throw new IllegalStateException("Error al actualizar registro de fuerza: " + e.getMessage());
@@ -365,6 +367,8 @@ public class TrainingAppService {
         try (Connection conn = conexionDB.conectar()) {
             validarUsuarioExiste(conn, request.getUsuarioId());
             int deporteId = obtenerOCrearDeporteCorrer(conn, dificultad);
+
+            guardarDificultadYTiempoEnDeporte(conn, deporteId, dificultad, request.getTiempoCorridoMinutos());
 
             String sql = "INSERT INTO public.progreso_bitacora_extra "
                     + "(usuario_id, deporte_id, duracion_minutos, fecha) "
@@ -448,6 +452,8 @@ public class TrainingAppService {
             validarRegistroCorrerExiste(conn, registroExtraId);
             validarUsuarioExiste(conn, request.getUsuarioId());
             int deporteId = obtenerOCrearDeporteCorrer(conn, dificultad);
+
+            guardarDificultadYTiempoEnDeporte(conn, deporteId, dificultad, request.getTiempoCorridoMinutos());
 
             String sql = "UPDATE public.progreso_bitacora_extra "
                     + "SET usuario_id = ?, deporte_id = ?, duracion_minutos = ?, fecha = ? "
@@ -684,7 +690,23 @@ public class TrainingAppService {
         out.setEjercicioId(rs.getInt("ejercicio_id"));
         out.setEjercicioNombre(rs.getString("ejercicio_nombre"));
         out.setSerieNumero(rs.getInt("serie_numero"));
-        out.setRepeticiones(rs.getInt("repeticiones"));
+        
+        // Leer repeticiones desde instrucciones_json del ejercicio
+        String instruccionesJson = clean(rs.getString("instrucciones_json"));
+        int repeticiones = 8; // valor por defecto
+        if (!instruccionesJson.isEmpty()) {
+            try {
+                int startIdx = instruccionesJson.indexOf("repeticiones") + 14;
+                int endIdx = instruccionesJson.indexOf("}", startIdx);
+                if (startIdx > 13 && endIdx > startIdx) {
+                    String repStr = instruccionesJson.substring(startIdx, endIdx).trim();
+                    repeticiones = Integer.parseInt(repStr);
+                }
+            } catch (Exception e) {
+                // Si falla el parseo, usar default
+            }
+        }
+        out.setRepeticiones(repeticiones);
         out.setPesoKg(rs.getDouble("peso_kg"));
         Timestamp ts = rs.getTimestamp("fecha");
         if (ts != null) {
@@ -706,11 +728,21 @@ public class TrainingAppService {
         }
 
         String descripcion = clean(rs.getString("descripcion"));
-        if (descripcion.startsWith(DIFICULTAD_PREFIX)) {
-            out.setDificultad(descripcion.substring(DIFICULTAD_PREFIX.length()));
-        } else {
-            out.setDificultad("Media");
+        String dificultad = "Media";
+        
+        // Parsear descripcion: "Dificultad: {valor}, Tiempo: {min} min"
+        if (descripcion.contains("Dificultad:")) {
+            try {
+                int startIdx = descripcion.indexOf("Dificultad:") + 11;
+                int endIdx = descripcion.indexOf(",", startIdx);
+                if (endIdx > startIdx) {
+                    dificultad = descripcion.substring(startIdx, endIdx).trim();
+                }
+            } catch (Exception e) {
+                // Si falla, usar valor por defecto
+            }
         }
+        out.setDificultad(dificultad);
         return out;
     }
 
@@ -721,5 +753,25 @@ public class TrainingAppService {
     private String nullableTrim(String value) {
         String cleaned = clean(value);
         return cleaned.isEmpty() ? null : cleaned;
+    }
+
+    private void guardarRepeticionesEnEjercicio(Connection conn, int ejercicioId, int repeticiones) throws SQLException {
+        String jsonReps = "{\"repeticiones\": " + repeticiones + "}";
+        String sql = "UPDATE public.entrenamiento_ejercicios SET instrucciones_json = ? WHERE ejercicio_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, jsonReps);
+            ps.setInt(2, ejercicioId);
+            ps.executeUpdate();
+        }
+    }
+
+    private void guardarDificultadYTiempoEnDeporte(Connection conn, int deporteId, String dificultad, int tiempoMin) throws SQLException {
+        String descripcion = "Dificultad: " + dificultad + ", Tiempo: " + tiempoMin + " min";
+        String sql = "UPDATE public.entrenamiento_deportes_extra SET descripcion = ? WHERE deporte_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, descripcion);
+            ps.setInt(2, deporteId);
+            ps.executeUpdate();
+        }
     }
 }
