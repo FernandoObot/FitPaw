@@ -366,25 +366,28 @@ public class TrainingAppService {
 
         try (Connection conn = conexionDB.conectar()) {
             validarUsuarioExiste(conn, request.getUsuarioId());
-            int deporteId = obtenerOCrearDeporteCorrer(conn, dificultad);
+            int ejercicioId = obtenerOCrearEjercicioCorrer(conn, dificultad);
 
-            guardarDificultadYTiempoEnDeporte(conn, deporteId, dificultad, request.getTiempoCorridoMinutos());
+            guardarDificultadEnEjercicio(conn, ejercicioId, dificultad);
 
-            String sql = "INSERT INTO public.progreso_bitacora_extra "
-                    + "(usuario_id, deporte_id, duracion_minutos, fecha) "
-                    + "VALUES (?, ?, ?, ?) RETURNING registro_extra_id";
+            // Registrar en progreso_bitacora_fuerza como ejercicio cardio
+            String sql = "INSERT INTO public.progreso_bitacora_fuerza "
+                    + "(usuario_id, ejercicio_id, serie_numero, peso_kg, repeticiones, fecha) "
+                    + "VALUES (?, ?, ?, ?, ?, ?) RETURNING registro_id";
 
             int registroId;
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, request.getUsuarioId());
-                ps.setInt(2, deporteId);
-                ps.setInt(3, request.getTiempoCorridoMinutos());
-                ps.setDate(4, Date.valueOf(request.getFecha() != null ? request.getFecha() : LocalDate.now()));
+                ps.setInt(2, ejercicioId);
+                ps.setInt(3, request.getTiempoCorridoMinutos()); // serie_numero = tiempo en minutos
+                ps.setDouble(4, 0.0); // peso_kg = 0 (no aplica para correr)
+                ps.setInt(5, 0); // repeticiones = 0 (no aplica para correr)
+                ps.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
                 try (ResultSet rs = ps.executeQuery()) {
                     if (!rs.next()) {
                         throw new IllegalStateException("No se pudo crear registro de correr");
                     }
-                    registroId = rs.getInt("registro_extra_id");
+                    registroId = rs.getInt("registro_id");
                 }
             }
             return obtenerRegistroCorrer(registroId);
@@ -393,16 +396,16 @@ public class TrainingAppService {
         }
     }
 
-    public RegistroCorrerResponse obtenerRegistroCorrer(int registroExtraId) {
-        validarId(registroExtraId, "registroExtraId");
+    public RegistroCorrerResponse obtenerRegistroCorrer(int registroId) {
+        validarId(registroId, "registroId");
         try (Connection conn = conexionDB.conectar()) {
-            String sql = "SELECT b.registro_extra_id, b.usuario_id, b.deporte_id, b.duracion_minutos, b.fecha, "
-                    + "d.descripcion "
-                    + "FROM public.progreso_bitacora_extra b "
-                    + "JOIN public.entrenamiento_deportes_extra d ON d.deporte_id = b.deporte_id "
-                    + "WHERE b.registro_extra_id = ? AND d.nombre = ?";
+            String sql = "SELECT b.registro_id, b.usuario_id, b.ejercicio_id, b.serie_numero, e.descripcion, "
+                    + "b.fecha "
+                    + "FROM public.progreso_bitacora_fuerza b "
+                    + "JOIN public.entrenamiento_ejercicios e ON e.ejercicio_id = b.ejercicio_id "
+                    + "WHERE b.registro_id = ? AND e.nombre = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, registroExtraId);
+                ps.setInt(1, registroId);
                 ps.setString(2, CORRER_NOMBRE);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
@@ -410,7 +413,7 @@ public class TrainingAppService {
                     }
                 }
             }
-            throw new NoSuchElementException("No existe el registro de correr con id " + registroExtraId);
+            throw new NoSuchElementException("No existe el registro de correr con id " + registroId);
         } catch (SQLException e) {
             throw new IllegalStateException("Error al consultar registro de correr: " + e.getMessage());
         }
@@ -421,11 +424,11 @@ public class TrainingAppService {
         try (Connection conn = conexionDB.conectar()) {
             validarUsuarioExiste(conn, usuarioId);
 
-            String sql = "SELECT b.registro_extra_id, b.usuario_id, b.deporte_id, b.duracion_minutos, b.fecha, d.descripcion "
-                    + "FROM public.progreso_bitacora_extra b "
-                    + "JOIN public.entrenamiento_deportes_extra d ON d.deporte_id = b.deporte_id "
-                    + "WHERE b.usuario_id = ? AND d.nombre = ? "
-                    + "ORDER BY b.fecha DESC, b.registro_extra_id DESC";
+            String sql = "SELECT b.registro_id, b.usuario_id, b.ejercicio_id, b.serie_numero, e.descripcion, b.fecha "
+                    + "FROM public.progreso_bitacora_fuerza b "
+                    + "JOIN public.entrenamiento_ejercicios e ON e.ejercicio_id = b.ejercicio_id "
+                    + "WHERE b.usuario_id = ? AND e.nombre = ? "
+                    + "ORDER BY b.fecha DESC, b.registro_id DESC";
 
             List<RegistroCorrerResponse> out = new ArrayList<>();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -443,43 +446,45 @@ public class TrainingAppService {
         }
     }
 
-    public RegistroCorrerResponse actualizarRegistroCorrer(int registroExtraId, RegistroCorrerRequest request) {
-        validarId(registroExtraId, "registroExtraId");
+    public RegistroCorrerResponse actualizarRegistroCorrer(int registroId, RegistroCorrerRequest request) {
+        validarId(registroId, "registroId");
         validarRequestCorrer(request);
         String dificultad = normalizarDificultad(request.getDificultad());
 
         try (Connection conn = conexionDB.conectar()) {
-            validarRegistroCorrerExiste(conn, registroExtraId);
+            validarRegistroCorrerExiste(conn, registroId);
             validarUsuarioExiste(conn, request.getUsuarioId());
-            int deporteId = obtenerOCrearDeporteCorrer(conn, dificultad);
+            int ejercicioId = obtenerOCrearEjercicioCorrer(conn, dificultad);
 
-            guardarDificultadYTiempoEnDeporte(conn, deporteId, dificultad, request.getTiempoCorridoMinutos());
+            guardarDificultadEnEjercicio(conn, ejercicioId, dificultad);
 
-            String sql = "UPDATE public.progreso_bitacora_extra "
-                    + "SET usuario_id = ?, deporte_id = ?, duracion_minutos = ?, fecha = ? "
-                    + "WHERE registro_extra_id = ?";
+            String sql = "UPDATE public.progreso_bitacora_fuerza "
+                    + "SET usuario_id = ?, ejercicio_id = ?, serie_numero = ?, peso_kg = ?, repeticiones = ?, fecha = ? "
+                    + "WHERE registro_id = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, request.getUsuarioId());
-                ps.setInt(2, deporteId);
-                ps.setInt(3, request.getTiempoCorridoMinutos());
-                ps.setDate(4, Date.valueOf(request.getFecha() != null ? request.getFecha() : LocalDate.now()));
-                ps.setInt(5, registroExtraId);
+                ps.setInt(2, ejercicioId);
+                ps.setInt(3, request.getTiempoCorridoMinutos()); // serie_numero = tiempo en minutos
+                ps.setDouble(4, 0.0);
+                ps.setInt(5, 0);
+                ps.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
+                ps.setInt(7, registroId);
                 ps.executeUpdate();
             }
 
-            return obtenerRegistroCorrer(registroExtraId);
+            return obtenerRegistroCorrer(registroId);
         } catch (SQLException e) {
             throw new IllegalStateException("Error al actualizar registro de correr: " + e.getMessage());
         }
     }
 
-    public void eliminarRegistroCorrer(int registroExtraId) {
-        validarId(registroExtraId, "registroExtraId");
+    public void eliminarRegistroCorrer(int registroId) {
+        validarId(registroId, "registroId");
         try (Connection conn = conexionDB.conectar()) {
-            validarRegistroCorrerExiste(conn, registroExtraId);
-            String sql = "DELETE FROM public.progreso_bitacora_extra WHERE registro_extra_id = ?";
+            validarRegistroCorrerExiste(conn, registroId);
+            String sql = "DELETE FROM public.progreso_bitacora_fuerza WHERE registro_id = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, registroExtraId);
+                ps.setInt(1, registroId);
                 ps.executeUpdate();
             }
         } catch (SQLException e) {
@@ -591,34 +596,33 @@ public class TrainingAppService {
         throw new IllegalArgumentException("Dificultad invalida. Opciones: Facil, Media, Dificil");
     }
 
-    private int obtenerOCrearDeporteCorrer(Connection conn, String dificultad) throws SQLException {
-        String desc = DIFICULTAD_PREFIX + dificultad;
-
-        String buscar = "SELECT deporte_id FROM public.entrenamiento_deportes_extra "
-                + "WHERE nombre = ? AND descripcion = ? LIMIT 1";
+    private int obtenerOCrearEjercicioCorrer(Connection conn, String dificultad) throws SQLException {
+        String buscar = "SELECT ejercicio_id FROM public.entrenamiento_ejercicios "
+                + "WHERE nombre = ? LIMIT 1";
         try (PreparedStatement ps = conn.prepareStatement(buscar)) {
             ps.setString(1, CORRER_NOMBRE);
-            ps.setString(2, desc);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getInt("deporte_id");
+                    return rs.getInt("ejercicio_id");
                 }
             }
         }
 
-        String insert = "INSERT INTO public.entrenamiento_deportes_extra (nombre, descripcion) "
-                + "VALUES (?, ?) RETURNING deporte_id";
+        String insert = "INSERT INTO public.entrenamiento_ejercicios (nombre, grupo_muscular, descripcion, instrucciones_json) "
+                + "VALUES (?, ?, ?, ?) RETURNING ejercicio_id";
         try (PreparedStatement ps = conn.prepareStatement(insert)) {
             ps.setString(1, CORRER_NOMBRE);
-            ps.setString(2, desc);
+            ps.setString(2, "Cardio");
+            ps.setString(3, DIFICULTAD_PREFIX + dificultad);
+            ps.setString(4, null);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getInt("deporte_id");
+                    return rs.getInt("ejercicio_id");
                 }
             }
         }
 
-        throw new IllegalStateException("No fue posible resolver deporte_id para correr");
+        throw new IllegalStateException("No fue posible crear o resolver ejercicio 'Correr'");
     }
 
     private void validarUsuarioExiste(Connection conn, int usuarioId) throws SQLException {
@@ -659,9 +663,9 @@ public class TrainingAppService {
 
     private void validarRegistroCorrerExiste(Connection conn, int registroId) throws SQLException {
         String sql = "SELECT 1 "
-                + "FROM public.progreso_bitacora_extra b "
-                + "JOIN public.entrenamiento_deportes_extra d ON d.deporte_id = b.deporte_id "
-                + "WHERE b.registro_extra_id = ? AND d.nombre = ?";
+                + "FROM public.progreso_bitacora_fuerza b "
+                + "JOIN public.entrenamiento_ejercicios e ON e.ejercicio_id = b.ejercicio_id "
+                + "WHERE b.registro_id = ? AND e.nombre = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, registroId);
             ps.setString(2, CORRER_NOMBRE);
@@ -717,32 +721,26 @@ public class TrainingAppService {
 
     private RegistroCorrerResponse mapCorrer(ResultSet rs) throws SQLException {
         RegistroCorrerResponse out = new RegistroCorrerResponse();
-        out.setRegistroExtraId(rs.getInt("registro_extra_id"));
+        out.setRegistroExtraId(rs.getInt("registro_id"));
         out.setUsuarioId(rs.getInt("usuario_id"));
-        out.setDeporteId(rs.getInt("deporte_id"));
-        out.setTiempoCorridoMinutos(rs.getInt("duracion_minutos"));
+        out.setDeporteId(rs.getInt("ejercicio_id"));
 
         Date fecha = rs.getDate("fecha");
         if (fecha != null) {
             out.setFecha(fecha.toLocalDate());
         }
 
+        // Leer dificultad desde descripcion
         String descripcion = clean(rs.getString("descripcion"));
         String dificultad = "Media";
-        
-        // Parsear descripcion: "Dificultad: {valor}, Tiempo: {min} min"
-        if (descripcion.contains("Dificultad:")) {
-            try {
-                int startIdx = descripcion.indexOf("Dificultad:") + 11;
-                int endIdx = descripcion.indexOf(",", startIdx);
-                if (endIdx > startIdx) {
-                    dificultad = descripcion.substring(startIdx, endIdx).trim();
-                }
-            } catch (Exception e) {
-                // Si falla, usar valor por defecto
-            }
+        if (descripcion.startsWith(DIFICULTAD_PREFIX)) {
+            dificultad = descripcion.substring(DIFICULTAD_PREFIX.length());
         }
         out.setDificultad(dificultad);
+        
+        // Leer tiempo desde serie_numero (para Correr, serie_numero = minutos corridos)
+        int tiempoMin = rs.getInt("serie_numero");
+        out.setTiempoCorridoMinutos(tiempoMin);
         return out;
     }
 
@@ -765,12 +763,21 @@ public class TrainingAppService {
         }
     }
 
-    private void guardarDificultadYTiempoEnDeporte(Connection conn, int deporteId, String dificultad, int tiempoMin) throws SQLException {
-        String descripcion = "Dificultad: " + dificultad + ", Tiempo: " + tiempoMin + " min";
-        String sql = "UPDATE public.entrenamiento_deportes_extra SET descripcion = ? WHERE deporte_id = ?";
+    private void guardarTiempoEnEjercicio(Connection conn, int ejercicioId, int tiempoMin) throws SQLException {
+        String json = "{\"tiempo\": " + tiempoMin + "}";
+        String sql = "UPDATE public.entrenamiento_ejercicios SET instrucciones_json = ? WHERE ejercicio_id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, descripcion);
-            ps.setInt(2, deporteId);
+            ps.setString(1, json);
+            ps.setInt(2, ejercicioId);
+            ps.executeUpdate();
+        }
+    }
+
+    private void guardarDificultadEnEjercicio(Connection conn, int ejercicioId, String dificultad) throws SQLException {
+        String sql = "UPDATE public.entrenamiento_ejercicios SET descripcion = ? WHERE ejercicio_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, DIFICULTAD_PREFIX + dificultad);
+            ps.setInt(2, ejercicioId);
             ps.executeUpdate();
         }
     }
