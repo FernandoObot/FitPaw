@@ -32,14 +32,17 @@ public class AuthService {
     private final ConexionDB conexionDB;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final MascotaLogrosService mascotaLogrosService;
 
     @Value("${app.default.role:USER}")
     private String defaultRole;
 
-    public AuthService(ConexionDB conexionDB, BCryptPasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
+    public AuthService(ConexionDB conexionDB, BCryptPasswordEncoder passwordEncoder, JwtUtil jwtUtil,
+            MascotaLogrosService mascotaLogrosService) {
         this.conexionDB = conexionDB;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.mascotaLogrosService = mascotaLogrosService;
     }
 
     public RegisterResponse register(RegisterRequest request) {
@@ -61,6 +64,7 @@ public class AuthService {
 
         try (Connection conn = conexionDB.conectar()) {
             ensureAuthSchema(conn);
+            sincronizarSecuenciaUsuarios(conn);
 
             String checkSql = "SELECT usuario_id FROM public.usuarios_cuenta WHERE telefono = ?";
             try (PreparedStatement ps = conn.prepareStatement(checkSql)) {
@@ -129,6 +133,7 @@ public class AuthService {
                         int usuarioId = rs.getInt("usuario_id");
                         String hashed = rs.getString("password");
                         if (passwordEncoder.matches(password, hashed)) {
+                            mascotaLogrosService.otorgarRecompensasPrimerLogin(usuarioId);
                             try {
                                 String token = jwtUtil.generateToken(usuarioId, telefono);
                                 return new TokenResponse(token, usuarioId);
@@ -159,6 +164,14 @@ public class AuthService {
 
         try (PreparedStatement ps = conn.prepareStatement("CREATE UNIQUE INDEX IF NOT EXISTS usuarios_cuenta_telefono_idx ON public.usuarios_cuenta (telefono)")) {
             ps.execute();
+        }
+    }
+
+    private void sincronizarSecuenciaUsuarios(Connection conn) throws SQLException {
+        String sql = "SELECT setval(pg_get_serial_sequence('public.usuarios_cuenta', 'usuario_id'), "
+                + "COALESCE((SELECT MAX(usuario_id) FROM public.usuarios_cuenta), 0) + 1, false)";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.executeQuery();
         }
     }
 
