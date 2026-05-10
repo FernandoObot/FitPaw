@@ -6,7 +6,7 @@ public class RegistroCorrerRequest {
 
     private int usuarioId;
     private String dificultad;
-    private int tiempoCorridoMinutos;
+    private double distanciaKm;
     private LocalDate fecha;
 
     public RegistroCorrerRequest() {
@@ -28,12 +28,12 @@ public class RegistroCorrerRequest {
         this.dificultad = dificultad;
     }
 
-    public int getTiempoCorridoMinutos() {
-        return tiempoCorridoMinutos;
+    public double getDistanciaKm() {
+        return distanciaKm;
     }
 
-    public void setTiempoCorridoMinutos(int tiempoCorridoMinutos) {
-        this.tiempoCorridoMinutos = tiempoCorridoMinutos;
+    public void setDistanciaKm(double distanciaKm) {
+        this.distanciaKm = distanciaKm;
     }
 
     public LocalDate getFecha() {

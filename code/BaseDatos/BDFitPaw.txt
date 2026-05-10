@@ -71,6 +71,7 @@ CREATE TABLE public.progreso_bitacora_fuerza (
   usuario_id integer,
   ejercicio_id integer,
   serie_numero integer,
+  distancia_km numeric,
   peso_kg numeric,
   repeticiones integer,
   fecha timestamp without time zone,

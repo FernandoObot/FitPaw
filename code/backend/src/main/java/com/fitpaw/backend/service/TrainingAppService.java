@@ -6,7 +6,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,7 +57,7 @@ public class TrainingAppService {
         RegistroCorrerRequest correrRequest = new RegistroCorrerRequest();
         correrRequest.setUsuarioId(request.getUsuarioId());
         correrRequest.setDificultad(request.getDificultad());
-        correrRequest.setTiempoCorridoMinutos(request.getTiempoCorridoMinutos());
+        correrRequest.setDistanciaKm(request.getDistanciaKm());
         correrRequest.setFecha(request.getFecha());
 
         RegistroCorrerResponse creada = crearRegistroCorrer(correrRequest);
@@ -372,17 +371,18 @@ public class TrainingAppService {
 
             // Registrar en progreso_bitacora_fuerza como ejercicio cardio
             String sql = "INSERT INTO public.progreso_bitacora_fuerza "
-                    + "(usuario_id, ejercicio_id, serie_numero, peso_kg, repeticiones, fecha) "
-                    + "VALUES (?, ?, ?, ?, ?, ?) RETURNING registro_id";
+                    + "(usuario_id, ejercicio_id, serie_numero, distancia_km, peso_kg, repeticiones, fecha) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING registro_id";
 
             int registroId;
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, request.getUsuarioId());
                 ps.setInt(2, ejercicioId);
-                ps.setInt(3, request.getTiempoCorridoMinutos()); // serie_numero = tiempo en minutos
-                ps.setDouble(4, 0.0); // peso_kg = 0 (no aplica para correr)
-                ps.setInt(5, 0); // repeticiones = 0 (no aplica para correr)
-                ps.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
+                ps.setInt(3, Math.max(1, (int) Math.round(request.getDistanciaKm() * 1000.0)));
+                ps.setDouble(4, request.getDistanciaKm());
+                ps.setDouble(5, 0.0); // peso_kg = 0 (no aplica para correr)
+                ps.setInt(6, 0); // repeticiones = 0 (no aplica para correr)
+                ps.setTimestamp(7, Timestamp.valueOf(LocalDateTime.now()));
                 try (ResultSet rs = ps.executeQuery()) {
                     if (!rs.next()) {
                         throw new IllegalStateException("No se pudo crear registro de correr");
@@ -399,7 +399,8 @@ public class TrainingAppService {
     public RegistroCorrerResponse obtenerRegistroCorrer(int registroId) {
         validarId(registroId, "registroId");
         try (Connection conn = conexionDB.conectar()) {
-            String sql = "SELECT b.registro_id, b.usuario_id, b.ejercicio_id, b.serie_numero, e.descripcion, "
+                String sql = "SELECT b.registro_id, b.usuario_id, b.ejercicio_id, b.serie_numero, "
+                    + "COALESCE(b.distancia_km, b.serie_numero / 1000.0) AS distancia_km, e.descripcion, "
                     + "b.fecha "
                     + "FROM public.progreso_bitacora_fuerza b "
                     + "JOIN public.entrenamiento_ejercicios e ON e.ejercicio_id = b.ejercicio_id "
@@ -424,7 +425,8 @@ public class TrainingAppService {
         try (Connection conn = conexionDB.conectar()) {
             validarUsuarioExiste(conn, usuarioId);
 
-            String sql = "SELECT b.registro_id, b.usuario_id, b.ejercicio_id, b.serie_numero, e.descripcion, b.fecha "
+                String sql = "SELECT b.registro_id, b.usuario_id, b.ejercicio_id, b.serie_numero, "
+                    + "COALESCE(b.distancia_km, b.serie_numero / 1000.0) AS distancia_km, e.descripcion, b.fecha "
                     + "FROM public.progreso_bitacora_fuerza b "
                     + "JOIN public.entrenamiento_ejercicios e ON e.ejercicio_id = b.ejercicio_id "
                     + "WHERE b.usuario_id = ? AND e.nombre = ? "
@@ -459,16 +461,17 @@ public class TrainingAppService {
             guardarDificultadEnEjercicio(conn, ejercicioId, dificultad);
 
             String sql = "UPDATE public.progreso_bitacora_fuerza "
-                    + "SET usuario_id = ?, ejercicio_id = ?, serie_numero = ?, peso_kg = ?, repeticiones = ?, fecha = ? "
+                    + "SET usuario_id = ?, ejercicio_id = ?, serie_numero = ?, distancia_km = ?, peso_kg = ?, repeticiones = ?, fecha = ? "
                     + "WHERE registro_id = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, request.getUsuarioId());
                 ps.setInt(2, ejercicioId);
-                ps.setInt(3, request.getTiempoCorridoMinutos()); // serie_numero = tiempo en minutos
-                ps.setDouble(4, 0.0);
-                ps.setInt(5, 0);
-                ps.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
-                ps.setInt(7, registroId);
+                ps.setInt(3, Math.max(1, (int) Math.round(request.getDistanciaKm() * 1000.0)));
+                ps.setDouble(4, request.getDistanciaKm());
+                ps.setDouble(5, 0.0);
+                ps.setInt(6, 0);
+                ps.setTimestamp(7, Timestamp.valueOf(LocalDateTime.now()));
+                ps.setInt(8, registroId);
                 ps.executeUpdate();
             }
 
@@ -553,8 +556,8 @@ public class TrainingAppService {
         }
         validarUsuarioId(request.getUsuarioId());
         normalizarDificultad(request.getDificultad());
-        if (request.getTiempoCorridoMinutos() <= 0) {
-            throw new IllegalArgumentException("El tiempo corrido debe ser mayor a 0");
+        if (request.getDistanciaKm() <= 0) {
+            throw new IllegalArgumentException("La distancia corrida debe ser mayor a 0");
         }
     }
 
@@ -738,9 +741,13 @@ public class TrainingAppService {
         }
         out.setDificultad(dificultad);
         
-        // Leer tiempo desde serie_numero (para Correr, serie_numero = minutos corridos)
-        int tiempoMin = rs.getInt("serie_numero");
-        out.setTiempoCorridoMinutos(tiempoMin);
+        double distanciaKm = 0.0;
+        try {
+            distanciaKm = rs.getDouble("distancia_km");
+        } catch (SQLException ignored) {
+            distanciaKm = rs.getInt("serie_numero") / 1000.0;
+        }
+        out.setDistanciaKm(distanciaKm);
         return out;
     }
 
@@ -758,16 +765,6 @@ public class TrainingAppService {
         String sql = "UPDATE public.entrenamiento_ejercicios SET instrucciones_json = ? WHERE ejercicio_id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, jsonReps);
-            ps.setInt(2, ejercicioId);
-            ps.executeUpdate();
-        }
-    }
-
-    private void guardarTiempoEnEjercicio(Connection conn, int ejercicioId, int tiempoMin) throws SQLException {
-        String json = "{\"tiempo\": " + tiempoMin + "}";
-        String sql = "UPDATE public.entrenamiento_ejercicios SET instrucciones_json = ? WHERE ejercicio_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, json);
             ps.setInt(2, ejercicioId);
             ps.executeUpdate();
         }
