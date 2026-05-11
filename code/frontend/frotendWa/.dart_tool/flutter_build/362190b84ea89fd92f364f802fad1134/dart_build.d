@@ -1,0 +1,1 @@
+ /home/fernando/Documentos/Cuarto\ semestre\ UNI/Principios\ de\ Construccion/FitPaw/code/frontend/frotend-_2/.dart_tool/flutter_build/362190b84ea89fd92f364f802fad1134/dart_build_result.json: 
