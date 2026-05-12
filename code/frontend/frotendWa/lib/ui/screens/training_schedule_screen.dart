@@ -5,12 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../../core/app_colors.dart';
+import '../../services/api_client.dart';
+import '../../services/workout_schedule_service.dart';
 import 'routine_selection_screen.dart';
 import '../widgets/responsive.dart';
 import 'camera_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'pet_screen.dart';
 import 'profile_screen.dart';
+import 'sentadillas_screen.dart';
 
 class TrainingScheduleScreen extends StatefulWidget {
   final String exerciseTitle;
@@ -29,6 +32,7 @@ class TrainingScheduleScreen extends StatefulWidget {
 }
 
 class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
+  final WorkoutScheduleService _scheduleService = WorkoutScheduleService(ApiClient());
   static const List<String> _monthNames = [
     'Enero',
     'Febrero',
@@ -84,6 +88,7 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
   Timer? _clockTimer;
   bool _didScrollToNow = false;
   int _selectedBottomIndex = 1;
+  SentadillasPlan? _sentadillasPlan;
 
   @override
   void initState() {
@@ -92,6 +97,7 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     _selectedDate = DateTime(now.year, now.month, now.day);
     _currentMonth = DateTime(now.year, now.month, 1);
     _now = now;
+    _loadSentadillasPlan();
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (!mounted) {
         return;
@@ -114,6 +120,14 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     _timelineController.dispose();
     _monthController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSentadillasPlan() async {
+    final plan = await _scheduleService.loadSentadillasPlan(weekday: _selectedDate.weekday);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _sentadillasPlan = plan);
   }
 
   @override
@@ -259,7 +273,13 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
                         final bool isSelected = _isSameDay(day, _selectedDate);
 
                         return GestureDetector(
-                          onTap: () => setState(() => _selectedDate = day),
+                          onTap: () {
+                            setState(() {
+                              _selectedDate = day;
+                              _sentadillasPlan = null;
+                            });
+                            _loadSentadillasPlan();
+                          },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 220),
                             curve: Curves.easeOut,
@@ -365,39 +385,56 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
                                               );
                                             },
                                             child: item == null
-                                                ? SizedBox(height: 44 * scale)
-                                                : Container(
-                                                    key: ValueKey<String>('${item.exercise}-${item.time}-${_selectedDate.toIso8601String()}'),
-                                                    width: double.infinity,
-                                                    padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
-                                                    decoration: BoxDecoration(
-                                                      color: item.color,
-                                                      borderRadius: BorderRadius.circular(24 * scale),
-                                                    ),
-                                                    child: Row(
-                                                      children: [
-                                                        Container(
-                                                          width: 10 * scale,
-                                                          height: 10 * scale,
-                                                          decoration: const BoxDecoration(
-                                                            shape: BoxShape.circle,
-                                                            color: Colors.white,
+                                                  ? SizedBox(height: 44 * scale)
+                                                  : Material(
+                                                      color: Colors.transparent,
+                                                      child: InkWell(
+                                                        borderRadius: BorderRadius.circular(24 * scale),
+                                                        onTap: item.exercise.toLowerCase().contains('sentadillas')
+                                                            ? () {
+                                                                Navigator.of(context)
+                                                                    .push(
+                                                                      MaterialPageRoute(
+                                                                        builder: (_) => SentadillasScreen(weekday: _selectedDate.weekday),
+                                                                      ),
+                                                                    )
+                                                                    .then((_) => _loadSentadillasPlan());
+                                                              }
+                                                            : null,
+                                                        child: Container(
+                                                          key: ValueKey<String>('${item.exercise}-${item.time}-${_selectedDate.toIso8601String()}'),
+                                                          width: double.infinity,
+                                                          padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
+                                                          decoration: BoxDecoration(
+                                                            color: item.color,
+                                                            borderRadius: BorderRadius.circular(24 * scale),
+                                                          ),
+                                                          child: Row(
+                                                            children: [
+                                                              Container(
+                                                                width: 10 * scale,
+                                                                height: 10 * scale,
+                                                                decoration: const BoxDecoration(
+                                                                  shape: BoxShape.circle,
+                                                                  color: Colors.white,
+                                                                ),
+                                                              ),
+                                                              SizedBox(width: 10 * scale),
+                                                              Expanded(
+                                                                child: Text(
+                                                                  item.exercise,
+                                                                  style: TextStyle(
+                                                                    color: Colors.white,
+                                                                    fontSize: Responsive.fs(context, 13),
+                                                                    fontWeight: FontWeight.w600,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
                                                           ),
                                                         ),
-                                                        SizedBox(width: 10 * scale),
-                                                        Expanded(
-                                                          child: Text(
-                                                            item.exercise,
-                                                            style: TextStyle(
-                                                              color: Colors.white,
-                                                              fontSize: Responsive.fs(context, 13),
-                                                              fontWeight: FontWeight.w600,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
+                                                      ),
                                                     ),
-                                                  ),
                                           ),
                                           if (isCurrentSlot)
                                             Positioned(
@@ -919,34 +956,98 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
 
   List<_ScheduleItem> _scheduleForDate(DateTime date) {
     final int weekday = date.weekday;
+    final _ScheduleItem? planItem = _buildSentadillasPlanItem(date);
 
     if (weekday == DateTime.monday) {
-      return [
+      final items = <_ScheduleItem>[
         _ScheduleItem(time: '07:00 AM', exercise: 'Abdomen, 7:30am', color: const Color(0xFF9DEFAF)),
         _ScheduleItem(time: '09:00 AM', exercise: widget.exerciseTitle, color: const Color(0xFF70E0F0)),
         _ScheduleItem(time: '03:00 PM', exercise: 'Biceps, 3pm', color: const Color(0xFFF5F2F5)),
       ];
+
+      if (planItem != null) {
+        _upsertScheduleItem(items, planItem);
+      }
+      return items;
     }
 
     if (weekday == DateTime.thursday) {
-      return [
+      final items = <_ScheduleItem>[
         _ScheduleItem(time: '07:30 AM', exercise: 'Abdomen, 7:30am', color: const Color(0xFF95F19B)),
         _ScheduleItem(time: '09:00 AM', exercise: 'Cuerpo bajo, 9am', color: const Color(0xFF86E9D7)),
         _ScheduleItem(time: '03:00 PM', exercise: 'Biceps, 3pm', color: const Color(0xFFF5F2F5)),
       ];
+
+      if (planItem != null) {
+        _upsertScheduleItem(items, planItem);
+      }
+      return items;
     }
 
     if (weekday == DateTime.friday) {
-      return [
+      final items = <_ScheduleItem>[
         _ScheduleItem(time: '08:00 AM', exercise: 'Pierna y core', color: const Color(0xFF95F19B)),
         _ScheduleItem(time: '11:00 AM', exercise: 'Cardio suave', color: const Color(0xFF70E0F0)),
       ];
+
+      if (planItem != null) {
+        _upsertScheduleItem(items, planItem);
+      }
+      return items;
     }
 
-    return [
+    final items = <_ScheduleItem>[
       _ScheduleItem(time: '09:00 AM', exercise: widget.exerciseTitle, color: const Color(0xFF9BEF9F)),
       _ScheduleItem(time: '03:00 PM', exercise: widget.exerciseSubtitle, color: const Color(0xFFF5F2F5)),
     ];
+
+    if (planItem != null) {
+      _upsertScheduleItem(items, planItem);
+    }
+    return items;
+  }
+
+  _ScheduleItem? _buildSentadillasPlanItem(DateTime date) {
+    final plan = _sentadillasPlan;
+    if (plan == null || plan.weekday != date.weekday || !widget.exerciseTitle.toLowerCase().contains('sentad')) {
+      return null;
+    }
+
+    return _ScheduleItem(
+      time: plan.timeLabel,
+      exercise: plan.summaryLabel,
+      color: const Color(0xFF70E0F0),
+    );
+  }
+
+  void _upsertScheduleItem(List<_ScheduleItem> items, _ScheduleItem item) {
+    final int existingIndex = items.indexWhere((current) => current.time == item.time);
+    if (existingIndex >= 0) {
+      items[existingIndex] = item;
+      return;
+    }
+
+    items.add(item);
+    items.sort((left, right) => _timeIndex(left.time).compareTo(_timeIndex(right.time)));
+  }
+
+  int _timeIndex(String time) {
+    final index = _timeSlots.indexOf(time);
+    if (index >= 0) {
+      return index;
+    }
+
+    final parts = time.split(' ');
+    if (parts.length != 2) {
+      return _timeSlots.length;
+    }
+
+    final hm = parts[0].split(':');
+    final hour = int.tryParse(hm[0]) ?? 0;
+    final minute = int.tryParse(hm.length > 1 ? hm[1] : '0') ?? 0;
+    final isPm = parts[1].toUpperCase() == 'PM';
+    final normalizedHour = hour % 12 + (isPm ? 12 : 0);
+    return normalizedHour * 60 + minute;
   }
 
   String _monthYearTitle(DateTime date) {

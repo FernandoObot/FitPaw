@@ -2,16 +2,21 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
+import '../../services/api_client.dart';
+import '../../services/workout_schedule_service.dart';
 import '../widgets/responsive.dart';
 
 class SentadillasScreen extends StatefulWidget {
-  const SentadillasScreen({super.key});
+  final int weekday;
+
+  const SentadillasScreen({super.key, required this.weekday});
 
   @override
   State<SentadillasScreen> createState() => _SentadillasScreenState();
 }
 
 class _SentadillasScreenState extends State<SentadillasScreen> {
+  final WorkoutScheduleService _scheduleService = WorkoutScheduleService(ApiClient());
   int _selectedHour = 9;
   int _selectedMinute = 2;
   String _selectedPeriod = 'PM';
@@ -19,6 +24,14 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
   String _selectedDifficulty = 'Media';
   String _selectedRepetitions = '8 - 12';
   String _selectedWeight = '12 kg';
+
+  static const List<String> _weekdayLabels = ['Lun', 'Mar', 'Mier', 'Juev', 'Vier', 'Sab', 'Dom'];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingPlan();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +98,7 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                           children: [
                             Icon(Icons.calendar_today_outlined, color: AppColors.textSecondary, size: 18 * scale),
                             SizedBox(width: 8 * scale),
-                            Text('Mier', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                            Text(_weekdayLabels[(widget.weekday - 1).clamp(0, 6)], style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                           ],
                         ),
                         SizedBox(height: 12 * scale),
@@ -197,7 +210,7 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                     width: double.infinity,
                     height: isCompact ? 54 * scale : 56 * scale,
                     child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: _guardarPlan,
                       style: ElevatedButton.styleFrom(
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28 * scale)),
@@ -229,6 +242,47 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _guardarPlan() async {
+    await _scheduleService.saveSentadillasPlan(
+      weekday: widget.weekday,
+      hour: _selectedHour,
+      minute: _selectedMinute,
+      period: _selectedPeriod,
+      difficulty: _selectedDifficulty,
+      repetitions: _selectedRepetitions,
+      weight: _selectedWeight,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Sentadillas guardadas en el horario')),
+    );
+    Navigator.pop(context);
+  }
+
+  Future<void> _loadExistingPlan() async {
+    try {
+      final plan = await _scheduleService.loadSentadillasPlan(weekday: widget.weekday);
+      if (!mounted || plan == null) {
+        return;
+      }
+
+      setState(() {
+        _selectedHour = plan.hour;
+        _selectedMinute = plan.minute;
+        _selectedPeriod = plan.period;
+        _selectedDifficulty = plan.difficulty;
+        _selectedRepetitions = plan.repetitions;
+        _selectedWeight = plan.weight;
+      });
+    } catch (_) {
+      // If the plan does not exist yet, keep the defaults.
+    }
   }
 
   void _showTimePickerSheet() {

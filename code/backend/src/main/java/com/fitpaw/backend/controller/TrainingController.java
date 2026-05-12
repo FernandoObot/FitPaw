@@ -6,6 +6,8 @@ import java.util.function.Supplier;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +27,7 @@ import com.fitpaw.backend.DTOs.RegistroCorrerResponse;
 import com.fitpaw.backend.DTOs.SerieFuerzaResponse;
 import com.fitpaw.backend.DTOs.UpdateEjercicioRequest;
 import com.fitpaw.backend.DTOs.CumplimientoMetaRequest;
+import com.fitpaw.backend.DTOs.SentadillasPlanRequest;
 import com.fitpaw.backend.DTOs.RegistrarDeporteExtraRequest;
 import com.fitpaw.backend.DTOs.RegistrarSerieRequest;
 import com.fitpaw.backend.service.TrainingAppService;
@@ -136,6 +139,20 @@ public class TrainingController {
     @PostMapping("/cumplimiento-meta")
     public ResponseEntity<?> procesarCumplimientoMeta(@RequestBody CumplimientoMetaRequest body) {
         return run(() -> trainingAppService.procesarCumplimientoMeta(body), HttpStatus.OK);
+    }
+
+    @PostMapping("/rutinas/sentadillas")
+    public ResponseEntity<?> guardarSentadillas(@RequestBody SentadillasPlanRequest body) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        int usuarioId = (int) auth.getDetails();
+        return run(() -> trainingAppService.guardarSentadillasPlan(usuarioId, body), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/rutinas/sentadillas")
+    public ResponseEntity<?> obtenerSentadillas(@RequestParam int diaSemana) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        int usuarioId = (int) auth.getDetails();
+        return run(() -> trainingAppService.obtenerSentadillasPlan(usuarioId, diaSemana), HttpStatus.OK);
     }
 
     private ResponseEntity<?> run(Supplier<Object> action, HttpStatus successStatus) {

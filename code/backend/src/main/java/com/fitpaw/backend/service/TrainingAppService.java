@@ -8,10 +8,13 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
+import java.util.Map;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import com.fitpaw.backend.DTOs.CreateEjercicioRequest;
@@ -22,12 +25,15 @@ import com.fitpaw.backend.DTOs.RegistroCorrerRequest;
 import com.fitpaw.backend.DTOs.RegistroCorrerResponse;
 import com.fitpaw.backend.DTOs.SerieFuerzaResponse;
 import com.fitpaw.backend.DTOs.CumplimientoMetaRequest;
+import com.fitpaw.backend.DTOs.SentadillasPlanRequest;
+import com.fitpaw.backend.DTOs.SentadillasPlanResponse;
 import com.fitpaw.backend.DTOs.RegistrarDeporteExtraRequest;
 import com.fitpaw.backend.DTOs.RegistrarSerieRequest;
 import com.fitpaw.backend.DTOs.UpdateEjercicioRequest;
 import com.fitpaw.backend.model.MetaUsuario;
 import com.fitpaw.backend.model.RegistroActividad;
 import com.fitpaw.backend.model.Racha;
+import com.fitpaw.backend.model.RutinaPersonalizada;
 import com.fitpaw.backend.repository.ConexionDB;
 
 @Service
@@ -35,9 +41,11 @@ public class TrainingAppService {
 
     private static final String CORRER_NOMBRE = "Correr";
     private static final String DIFICULTAD_PREFIX = "DIFICULTAD:";
+    private static final String SENTADILLAS_NOMBRE = "Sentadillas";
 
     private final ConexionDB conexionDB;
     private final MetaEvaluacionService metaEvaluacionService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public TrainingAppService(ConexionDB conexionDB, MetaEvaluacionService metaEvaluacionService) {
         this.conexionDB = conexionDB;
@@ -66,6 +74,72 @@ public class TrainingAppService {
                 "POST /training/deporte-extra",
                 "Registro de correr creado con id " + creada.getRegistroExtraId()
         );
+    }
+
+    public SentadillasPlanResponse guardarSentadillasPlan(int usuarioId, SentadillasPlanRequest request) {
+        validarUsuarioId(usuarioId);
+        validarSentadillasRequest(request);
+
+        try (Connection conn = conexionDB.conectar()) {
+            validarUsuarioExiste(conn, usuarioId);
+
+            String payload = serializarPlan(request);
+            int rutinaId = obtenerRutinaSentadillasId(conn, usuarioId, request.getDiaSemana());
+
+            if (rutinaId > 0) {
+                String sql = "UPDATE public.progreso_rutinas_personalizadas SET nombre_rutina = ?, dia_semana = ? "
+                        + "WHERE rutina_id = ?";
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, payload);
+                    ps.setInt(2, request.getDiaSemana());
+                    ps.setInt(3, rutinaId);
+                    ps.executeUpdate();
+                }
+            } else {
+                String sql = "INSERT INTO public.progreso_rutinas_personalizadas (usuario_id, nombre_rutina, dia_semana) "
+                        + "VALUES (?, ?, ?) RETURNING rutina_id";
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, usuarioId);
+                    ps.setString(2, payload);
+                    ps.setInt(3, request.getDiaSemana());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            rutinaId = rs.getInt("rutina_id");
+                        }
+                    }
+                }
+            }
+
+            return obtenerSentadillasPlan(usuarioId, request.getDiaSemana());
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al guardar plan de sentadillas: " + e.getMessage());
+        }
+    }
+
+    public SentadillasPlanResponse obtenerSentadillasPlan(int usuarioId, int diaSemana) {
+        validarUsuarioId(usuarioId);
+        validarDiaSemana(diaSemana);
+
+        try (Connection conn = conexionDB.conectar()) {
+            validarUsuarioExiste(conn, usuarioId);
+
+            String sql = "SELECT rutina_id, usuario_id, nombre_rutina, dia_semana "
+                    + "FROM public.progreso_rutinas_personalizadas "
+                    + "WHERE usuario_id = ? AND dia_semana = ? ORDER BY rutina_id DESC LIMIT 1";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, usuarioId);
+                ps.setInt(2, diaSemana);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return mapSentadillasPlan(rs);
+                    }
+                }
+            }
+
+            throw new NoSuchElementException("No existe plan de sentadillas para el dia " + diaSemana);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al consultar plan de sentadillas: " + e.getMessage());
+        }
     }
 
     public List<EjercicioCatalogoResponse> getCatalogoEjercicios() {
@@ -567,6 +641,29 @@ public class TrainingAppService {
         }
     }
 
+    private void validarDiaSemana(int diaSemana) {
+        if (diaSemana < 1 || diaSemana > 7) {
+            throw new IllegalArgumentException("diaSemana debe estar entre 1 y 7");
+        }
+    }
+
+    private void validarSentadillasRequest(SentadillasPlanRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("El body para sentadillas es obligatorio");
+        }
+
+        validarDiaSemana(request.getDiaSemana());
+        if (request.getHora() <= 0 || request.getHora() > 12) {
+            throw new IllegalArgumentException("La hora debe estar entre 1 y 12");
+        }
+        if (request.getMinuto() < 0 || request.getMinuto() > 59) {
+            throw new IllegalArgumentException("El minuto debe estar entre 0 y 59");
+        }
+        if (clean(request.getPeriodo()).isEmpty()) {
+            throw new IllegalArgumentException("El periodo es obligatorio");
+        }
+    }
+
     private void validarId(int id, String nombreCampo) {
         if (id <= 0) {
             throw new IllegalArgumentException(nombreCampo + " invalido");
@@ -758,6 +855,86 @@ public class TrainingAppService {
     private String nullableTrim(String value) {
         String cleaned = clean(value);
         return cleaned.isEmpty() ? null : cleaned;
+    }
+
+    private String serializarPlan(SentadillasPlanRequest request) {
+        Map<String, Object> plan = new HashMap<>();
+        plan.put("exercise", SENTADILLAS_NOMBRE);
+        plan.put("diaSemana", request.getDiaSemana());
+        plan.put("hora", request.getHora());
+        plan.put("minuto", request.getMinuto());
+        plan.put("periodo", clean(request.getPeriodo()));
+        plan.put("dificultad", clean(request.getDificultad()));
+        plan.put("repeticiones", clean(request.getRepeticiones()));
+        plan.put("peso", clean(request.getPeso()));
+
+        try {
+            return objectMapper.writeValueAsString(plan);
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo serializar el plan de sentadillas: " + e.getMessage());
+        }
+    }
+
+    private int obtenerRutinaSentadillasId(Connection conn, int usuarioId, int diaSemana) throws SQLException {
+        String sql = "SELECT rutina_id FROM public.progreso_rutinas_personalizadas "
+                + "WHERE usuario_id = ? AND dia_semana = ? ORDER BY rutina_id DESC LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, usuarioId);
+            ps.setInt(2, diaSemana);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("rutina_id");
+                }
+            }
+        }
+        return -1;
+    }
+
+    private SentadillasPlanResponse mapSentadillasPlan(ResultSet rs) throws SQLException {
+        SentadillasPlanResponse response = new SentadillasPlanResponse();
+        response.setRutinaId(rs.getInt("rutina_id"));
+        response.setUsuarioId(rs.getInt("usuario_id"));
+        response.setDiaSemana(rs.getInt("dia_semana"));
+
+        String raw = rs.getString("nombre_rutina");
+        if (raw != null && !raw.isBlank()) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> data = objectMapper.readValue(raw, Map.class);
+                response.setHora(asInt(data.get("hora"), 9));
+                response.setMinuto(asInt(data.get("minuto"), 0));
+                response.setPeriodo(asString(data.get("periodo"), "AM"));
+                response.setDificultad(asString(data.get("dificultad"), "Media"));
+                response.setRepeticiones(asString(data.get("repeticiones"), "8 - 12"));
+                response.setPeso(asString(data.get("peso"), "12 kg"));
+            } catch (Exception e) {
+                response.setHora(9);
+                response.setMinuto(0);
+                response.setPeriodo("AM");
+                response.setDificultad("Media");
+                response.setRepeticiones("8 - 12");
+                response.setPeso("12 kg");
+            }
+        }
+
+        return response;
+    }
+
+    private int asInt(Object value, int fallback) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text) {
+            try {
+                return Integer.parseInt(text);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return fallback;
+    }
+
+    private String asString(Object value, String fallback) {
+        return value == null ? fallback : value.toString();
     }
 
     private void guardarRepeticionesEnEjercicio(Connection conn, int ejercicioId, int repeticiones) throws SQLException {

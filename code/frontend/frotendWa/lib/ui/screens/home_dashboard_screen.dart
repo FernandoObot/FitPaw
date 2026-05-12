@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
 import '../widgets/responsive.dart';
+import '../../services/auth_service.dart';
+import '../../services/api_client.dart';
 import 'activity_history_screen.dart';
 import 'camera_screen.dart';
 import 'pet_screen.dart';
@@ -23,6 +25,9 @@ class HomeDashboardScreen extends StatefulWidget {
 
 class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTickerProviderStateMixin {
   late final AnimationController _streakController;
+  late final AuthService _authService;
+  String _profileName = 'Usuario';
+  bool _loadingProfileName = true;
   int _selectedBottomIndex = 0;
   int _selectedTaskIndex = 0;
   int _pressedTaskIndex = -1;
@@ -31,16 +36,37 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
   @override
   void initState() {
     super.initState();
+    _authService = AuthService(ApiClient());
     _streakController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1250),
     )..repeat(reverse: true);
+    _loadProfileName();
   }
 
   @override
   void dispose() {
     _streakController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadProfileName() async {
+    final result = await _authService.getProfile();
+    if (!mounted) {
+      return;
+    }
+
+    if (result['success'] == true) {
+      final data = result['data'] as Map<String, dynamic>;
+      setState(() {
+        _profileName = (data['nickname'] as String?)?.trim().isNotEmpty == true
+            ? data['nickname'] as String
+            : _profileName;
+        _loadingProfileName = false;
+      });
+    } else {
+      setState(() => _loadingProfileName = false);
+    }
   }
 
   @override
@@ -76,12 +102,16 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                                     ),
                                   ),
                                   SizedBox(height: 4 * scale),
-                                  Text(
-                                    'Jonathan',
-                                    style: TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: Responsive.fs(context, 42),
-                                      fontWeight: FontWeight.w700,
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 180),
+                                    child: Text(
+                                      _loadingProfileName ? '...' : _profileName,
+                                      key: ValueKey<String>(_profileName),
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: Responsive.fs(context, 42),
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -422,7 +452,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
 
     final task = tasks[index];
     if (index == 0) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SentadillasScreen())).then((_) => setState(() => _selectedTaskIndex = 0));
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => SentadillasScreen(weekday: DateTime.now().weekday)))
+          .then((_) => setState(() => _selectedTaskIndex = 0));
     } else if (index == 1) {
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PressHombrosScreen())).then((_) => setState(() => _selectedTaskIndex = 0));
     } else if (index == 2) {
