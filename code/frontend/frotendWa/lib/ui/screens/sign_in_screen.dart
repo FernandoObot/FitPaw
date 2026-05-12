@@ -1,12 +1,79 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
+import '../../services/auth_service.dart';
+import '../../services/api_client.dart';
 import '../widgets/responsive.dart';
 import 'front_home_stub_screen.dart';
 import 'sign_up_screen.dart';
 
-class SignInScreen extends StatelessWidget {
+class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
+
+  @override
+  State<SignInScreen> createState() => _SignInScreenState();
+}
+
+class _SignInScreenState extends State<SignInScreen> {
+  late AuthService authService;
+  final TextEditingController telefonoController = TextEditingController();
+  final TextEditingController contrasenaController = TextEditingController();
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    authService = AuthService(ApiClient());
+  }
+
+  @override
+  void dispose() {
+    telefonoController.dispose();
+    contrasenaController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _iniciarSesion() async {
+    if (telefonoController.text.isEmpty || contrasenaController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor completa todos los campos')),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      final result = await authService.login(
+        telefono: telefonoController.text,
+        password: contrasenaController.text,
+      );
+
+      if (result['success']) {
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(builder: (_) => const FrontHomeStubScreen()),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${result['error']}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,9 +92,18 @@ class SignInScreen extends StatelessWidget {
                   Text('Hola,', style: TextStyle(fontSize: Responsive.fs(context, 24), color: AppColors.textSecondary)),
                   Text('Bienvenido de vuelta', style: TextStyle(fontSize: Responsive.fs(context, 34), fontWeight: FontWeight.w700)),
                   SizedBox(height: 26 * scale),
-                  const _LoginField(hint: 'Telefono', icon: Icons.phone_outlined),
+                  _LoginField(
+                    controller: telefonoController,
+                    hint: 'Telefono',
+                    icon: Icons.phone_outlined,
+                  ),
                   SizedBox(height: 12 * scale),
-                  const _LoginField(hint: 'Contrasena', icon: Icons.lock_outline_rounded, obscure: true),
+                  _LoginField(
+                    controller: contrasenaController,
+                    hint: 'Contrasena',
+                    icon: Icons.lock_outline_rounded,
+                    obscure: true,
+                  ),
                   SizedBox(height: 10 * scale),
                   Text('Olvidaste tu contrasena?', style: TextStyle(fontSize: Responsive.fs(context, 12), color: AppColors.textSecondary, decoration: TextDecoration.underline)),
                   const Spacer(),
@@ -37,11 +113,18 @@ class SignInScreen extends StatelessWidget {
                     child: DecoratedBox(
                       decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(30 * scale)),
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => const FrontHomeStubScreen()));
-                        },
+                        onPressed: isLoading ? null : _iniciarSesion,
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent),
-                        icon: const Icon(Icons.login_rounded, color: Colors.white),
+                        icon: isLoading
+                            ? SizedBox(
+                                height: 24 * scale,
+                                width: 24 * scale,
+                                child: const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.login_rounded, color: Colors.white),
                         label: Text('Iniciar sesion', style: TextStyle(color: Colors.white, fontSize: Responsive.fs(context, 18), fontWeight: FontWeight.w700)),
                       ),
                     ),
@@ -72,15 +155,22 @@ class SignInScreen extends StatelessWidget {
 }
 
 class _LoginField extends StatelessWidget {
-  const _LoginField({required this.hint, required this.icon, this.obscure = false});
+  const _LoginField({
+    required this.hint,
+    required this.icon,
+    this.obscure = false,
+    this.controller,
+  });
 
   final String hint;
   final IconData icon;
   final bool obscure;
+  final TextEditingController? controller;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller,
       obscureText: obscure,
       decoration: InputDecoration(
         hintText: hint,

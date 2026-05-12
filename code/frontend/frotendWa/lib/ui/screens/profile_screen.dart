@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
 import '../widgets/responsive.dart';
+import '../../services/auth_service.dart';
+import '../../services/api_client.dart';
 import 'activity_history_screen.dart';
 import 'camera_screen.dart';
 import 'home_dashboard_screen.dart';
@@ -23,6 +25,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _selectedBottomIndex = 4;
   bool _isEditingProfile = false;
 
+  late final AuthService _authService;
+
   late final TextEditingController _nameController;
   late final TextEditingController _goalController;
   late final TextEditingController _heightController;
@@ -43,6 +47,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _heightController = TextEditingController(text: _profileHeight.replaceAll(' cm', ''));
     _weightController = TextEditingController(text: _profileWeight.replaceAll(' kg', ''));
     _ageController = TextEditingController(text: _profileAge);
+    _authService = AuthService(ApiClient());
+    _loadProfile();
   }
 
   @override
@@ -349,18 +355,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  void _saveProfileEdits() {
-    setState(() {
-      _profileName = _nameController.text.trim().isEmpty ? _profileName : _nameController.text.trim();
-      _profileGoal = _goalController.text.trim().isEmpty ? _profileGoal : _goalController.text.trim();
-      final String heightText = _heightController.text.trim();
-      final String weightText = _weightController.text.trim();
-      final String ageText = _ageController.text.trim();
-      _profileHeight = heightText.isEmpty ? _profileHeight : '$heightText cm';
-      _profileWeight = weightText.isEmpty ? _profileWeight : '$weightText kg';
-      _profileAge = ageText.isEmpty ? _profileAge : ageText;
-      _isEditingProfile = false;
-    });
+  Future<void> _saveProfileEdits() async {
+    final newName = _nameController.text.trim();
+    final newHeightText = _heightController.text.trim();
+    final newWeightText = _weightController.text.trim();
+
+    double? weight;
+    int? height;
+    if (newWeightText.isNotEmpty) {
+      weight = double.tryParse(newWeightText);
+    }
+    if (newHeightText.isNotEmpty) {
+      height = int.tryParse(newHeightText);
+    }
+
+    try {
+      final result = await _authService.editProfile(
+        nombreCompleto: newName.isEmpty ? null : newName,
+        pesoActual: weight,
+        estaturaCm: height,
+      );
+
+      if (result['success']) {
+        if (!mounted) return;
+        setState(() {
+          if (newName.isNotEmpty) _profileName = newName;
+          if (newHeightText.isNotEmpty && height != null) _profileHeight = '${height} cm';
+          if (newWeightText.isNotEmpty && weight != null) _profileWeight = '${weight.toString()} kg';
+          _profileGoal = _goalController.text.trim().isEmpty ? _profileGoal : _goalController.text.trim();
+          _isEditingProfile = false;
+        });
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${result['error']}')));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final result = await _authService.getProfile();
+      if (result['success']) {
+        final data = result['data'] as Map<String, dynamic>;
+        setState(() {
+          _profileName = data['nickname'] ?? _profileName;
+          _profileGoal = data['objetivoPrincipal'] ?? _profileGoal;
+          if (data['estaturaCm'] != null) _profileHeight = '${data['estaturaCm']} cm';
+          if (data['pesoActual'] != null) _profileWeight = '${data['pesoActual'].toString()} kg';
+          if (data['fechaNacimiento'] != null) {
+            try {
+              final fecha = DateTime.parse(data['fechaNacimiento']);
+              final now = DateTime.now();
+              final edad = now.year - fecha.year - ((now.month < fecha.month || (now.month == fecha.month && now.day < fecha.day)) ? 1 : 0);
+              _profileAge = edad.toString();
+            } catch (_) {}
+          }
+          // update controllers
+          _nameController.text = _profileName;
+          _goalController.text = _profileGoal;
+          _heightController.text = _profileHeight.replaceAll(' cm', '');
+          _weightController.text = _profileWeight.replaceAll(' kg', '');
+          _ageController.text = _profileAge;
+        });
+      }
+    } catch (e) {
+      // ignore loading errors silently for now
+    }
   }
 
   void _handleBottomTap(int index) {

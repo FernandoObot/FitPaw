@@ -15,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.auth0.jwt.exceptions.JWTCreationException;
+import com.fitpaw.backend.model.User;
 import com.fitpaw.backend.DTOs.LoginRequest;
 import com.fitpaw.backend.DTOs.RegisterRequest;
 import com.fitpaw.backend.DTOs.RegisterResponse;
@@ -264,6 +265,37 @@ public class AuthService {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Error al editar el perfil: " + e.getMessage());
+        }
+    }
+
+    public User getProfile(int usuarioId) {
+        try (Connection conn = conexionDB.conectar()) {
+            String sql = "SELECT usuario_id, nickname, objetivo_principal, genero, fecha_nacimiento, peso_actual, estatura_cm FROM public.usuarios_cuenta WHERE usuario_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, usuarioId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        User user = new User();
+                        user.setUsuarioId(rs.getInt("usuario_id"));
+                        user.setNickname(rs.getString("nickname"));
+                        user.setObjetivoPrincipal(rs.getString("objetivo_principal"));
+                        user.setGenero(rs.getString("genero"));
+                        java.sql.Date fecha = rs.getDate("fecha_nacimiento");
+                        if (fecha != null) {
+                            user.setFechaNacimiento(fecha.toLocalDate());
+                        }
+                        Double peso = rs.getDouble("peso_actual");
+                        if (!rs.wasNull()) user.setPesoActual(peso);
+                        Integer estatura = rs.getInt("estatura_cm");
+                        if (!rs.wasNull()) user.setEstaturaCm(estatura);
+                        return user;
+                    } else {
+                        throw new IllegalStateException("Usuario no encontrado");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al obtener perfil: " + e.getMessage());
         }
     }
 }

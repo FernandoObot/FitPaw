@@ -121,6 +121,57 @@ class AuthService {
     }
   }
 
+  Future<Map<String, dynamic>> getProfile() async {
+    try {
+      final response = await apiClient.get(
+        '/auth/profile/me',
+        needsAuth: true,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return {'success': true, 'data': data};
+      } else if (response.statusCode == 404) {
+        return {'success': false, 'error': 'Perfil no encontrado'};
+      } else {
+        return {'success': false, 'error': 'Error: ${response.statusCode}'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> editProfile({
+    String? nombreCompleto,
+    double? pesoActual,
+    int? estaturaCm,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (nombreCompleto != null) body['nombre'] = nombreCompleto;
+      if (pesoActual != null) body['peso'] = pesoActual;
+      if (estaturaCm != null) body['estatura'] = estaturaCm;
+
+      final response = await apiClient.put(
+        '/auth/profile/edit',
+        body: body,
+        needsAuth: true,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return {'success': true, 'data': data};
+      } else if (response.statusCode == 400) {
+        final error = jsonDecode(response.body);
+        return {'success': false, 'error': error['mensaje'] ?? 'Error al editar perfil'};
+      } else {
+        return {'success': false, 'error': 'Error: ${response.statusCode}'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Error: $e'};
+    }
+  }
+
   bool isLoggedIn() {
     return apiClient.getToken() != null;
   }

@@ -46,6 +46,11 @@ class ApiClient {
     bool needsAuth = false,
   }) async {
     try {
+      // Asegurar que el token esté cargado si se necesita autenticación
+      if (needsAuth && _token == null) {
+        await loadToken();
+      }
+      
       final response = await http.post(
         Uri.parse('$baseUrl$endpoint'),
         headers: _getHeaders(needsAuth: needsAuth),
@@ -63,6 +68,11 @@ class ApiClient {
     bool needsAuth = true,
   }) async {
     try {
+      // Asegurar que el token esté cargado
+      if (needsAuth && _token == null) {
+        await loadToken();
+      }
+      
       final response = await http.get(
         Uri.parse('$baseUrl$endpoint'),
         headers: _getHeaders(needsAuth: needsAuth),
@@ -80,6 +90,11 @@ class ApiClient {
     bool needsAuth = true,
   }) async {
     try {
+      // Asegurar que el token esté cargado
+      if (needsAuth && _token == null) {
+        await loadToken();
+      }
+      
       final response = await http.put(
         Uri.parse('$baseUrl$endpoint'),
         headers: _getHeaders(needsAuth: needsAuth),

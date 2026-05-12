@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -62,6 +63,41 @@ public class AuthController {
             
             authService.updateProfile(usuarioId, request);
             return ResponseEntity.ok(Map.of("mensaje", "Perfil actualizado exitosamente"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("mensaje", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("mensaje", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("mensaje", "Error interno: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/profile")
+    public ResponseEntity<?> getProfile() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            int usuarioId = (int) auth.getDetails();
+
+            com.fitpaw.backend.model.User user = authService.getProfile(usuarioId);
+            return ResponseEntity.ok(user);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("mensaje", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("mensaje", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("mensaje", "Error interno: " + e.getMessage()));
+        }
+    }
+
+    // Fallback GET mapping for profile to avoid potential mapping conflicts.
+    @GetMapping("/profile/me")
+    public ResponseEntity<?> getProfileMe() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            int usuarioId = (int) auth.getDetails();
+
+            com.fitpaw.backend.model.User user = authService.getProfile(usuarioId);
+            return ResponseEntity.ok(user);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("mensaje", e.getMessage()));
         } catch (IllegalStateException e) {
