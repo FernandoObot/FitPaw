@@ -13,18 +13,19 @@ import 'camera_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'pet_screen.dart';
 import 'profile_screen.dart';
-import 'sentadillas_screen.dart';
 
 class TrainingScheduleScreen extends StatefulWidget {
   final String exerciseTitle;
   final String exerciseSubtitle;
   final IconData exerciseIcon;
+  final DateTime? initialSelectedDate;
 
   const TrainingScheduleScreen({
     super.key,
     required this.exerciseTitle,
     required this.exerciseSubtitle,
     required this.exerciseIcon,
+    this.initialSelectedDate,
   });
 
   @override
@@ -94,7 +95,8 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
   void initState() {
     super.initState();
     final DateTime now = DateTime.now();
-    _selectedDate = DateTime(now.year, now.month, now.day);
+    final DateTime initialDate = widget.initialSelectedDate ?? now;
+    _selectedDate = DateTime(initialDate.year, initialDate.month, initialDate.day);
     _currentMonth = DateTime(now.year, now.month, 1);
     _now = now;
     _loadSentadillasPlan();
@@ -390,17 +392,7 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
                                                       color: Colors.transparent,
                                                       child: InkWell(
                                                         borderRadius: BorderRadius.circular(24 * scale),
-                                                        onTap: item.exercise.toLowerCase().contains('sentadillas')
-                                                            ? () {
-                                                                Navigator.of(context)
-                                                                    .push(
-                                                                      MaterialPageRoute(
-                                                                        builder: (_) => SentadillasScreen(weekday: _selectedDate.weekday),
-                                                                      ),
-                                                                    )
-                                                                    .then((_) => _loadSentadillasPlan());
-                                                              }
-                                                            : null,
+                                                        onTap: null,
                                                         child: Container(
                                                           key: ValueKey<String>('${item.exercise}-${item.time}-${_selectedDate.toIso8601String()}'),
                                                           width: double.infinity,
@@ -1014,10 +1006,29 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     }
 
     return _ScheduleItem(
-      time: plan.timeLabel,
+      time: _nearestVisibleTimeLabel(plan.hour, plan.minute, plan.period),
       exercise: plan.summaryLabel,
       color: const Color(0xFF70E0F0),
     );
+  }
+
+  String _nearestVisibleTimeLabel(int hour, int minute, String period) {
+    final int totalMinutes = (_normalizeHour(hour, period) * 60) + minute;
+    const int startMinutes = 6 * 60;
+    const int endMinutes = 20 * 60;
+    final int clamped = totalMinutes.clamp(startMinutes, endMinutes);
+    final int roundedHour = ((clamped + 30) ~/ 60).clamp(6, 20);
+    final String suffix = roundedHour >= 12 ? 'PM' : 'AM';
+    final int displayHour = roundedHour % 12 == 0 ? 12 : roundedHour % 12;
+    return '${displayHour.toString().padLeft(2, '0')}:00 $suffix';
+  }
+
+  int _normalizeHour(int hour, String period) {
+    final bool isPm = period.toUpperCase() == 'PM';
+    if (hour == 12) {
+      return isPm ? 12 : 0;
+    }
+    return isPm ? hour + 12 : hour;
   }
 
   void _upsertScheduleItem(List<_ScheduleItem> items, _ScheduleItem item) {

@@ -11,10 +11,10 @@ import 'profile_screen.dart';
 import 'streak_days_screen.dart';
 import 'training_schedule_screen.dart';
 import 'exercise_detail_screen.dart';
-import 'sentadillas_screen.dart';
 import 'running_screen.dart';
 import 'press_hombros_screen.dart';
 import 'flexion_una_pierna_screen.dart';
+import 'sentadillas_screen.dart';
 
 class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({super.key});
@@ -398,17 +398,17 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
     _selectBottom(index);
 
     if (index == 1) {
-      Navigator.of(context)
-          .push(
-            MaterialPageRoute(
-              builder: (_) => const TrainingScheduleScreen(
-                exerciseTitle: 'Sentadillas',
-                exerciseSubtitle: '3 series de 15 reps',
-                exerciseIcon: Icons.directions_run_rounded,
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (_) => TrainingScheduleScreen(
+                  exerciseTitle: 'Sentadillas',
+                  exerciseSubtitle: '3 series de 15 reps',
+                  exerciseIcon: Icons.directions_run_rounded,
+                ),
               ),
-            ),
-          )
-          .then((_) => _selectBottom(0));
+            )
+            .then((_) => _selectBottom(0));
     } else if (index == 2) {
       Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => const PetScreen()))
@@ -452,9 +452,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
 
     final task = tasks[index];
     if (index == 0) {
-      Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => SentadillasScreen(weekday: DateTime.now().weekday)))
-          .then((_) => setState(() => _selectedTaskIndex = 0));
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (_) => SentadillasScreen(selectedDate: DateTime.now()),
+              ),
+            )
+            .then((_) => setState(() => _selectedTaskIndex = 0));
     } else if (index == 1) {
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PressHombrosScreen())).then((_) => setState(() => _selectedTaskIndex = 0));
     } else if (index == 2) {

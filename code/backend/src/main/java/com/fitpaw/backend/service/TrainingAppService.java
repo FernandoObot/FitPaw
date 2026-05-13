@@ -858,21 +858,15 @@ public class TrainingAppService {
     }
 
     private String serializarPlan(SentadillasPlanRequest request) {
-        Map<String, Object> plan = new HashMap<>();
-        plan.put("exercise", SENTADILLAS_NOMBRE);
-        plan.put("diaSemana", request.getDiaSemana());
-        plan.put("hora", request.getHora());
-        plan.put("minuto", request.getMinuto());
-        plan.put("periodo", clean(request.getPeriodo()));
-        plan.put("dificultad", clean(request.getDificultad()));
-        plan.put("repeticiones", clean(request.getRepeticiones()));
-        plan.put("peso", clean(request.getPeso()));
-
-        try {
-            return objectMapper.writeValueAsString(plan);
-        } catch (Exception e) {
-            throw new IllegalStateException("No se pudo serializar el plan de sentadillas: " + e.getMessage());
-        }
+        return String.join("|",
+                "S",
+                "h=" + request.getHora(),
+                "m=" + String.format(Locale.ROOT, "%02d", request.getMinuto()),
+                "p=" + clean(request.getPeriodo()),
+                "d=" + clean(request.getDificultad()),
+                "r=" + clean(request.getRepeticiones()),
+                "w=" + clean(request.getPeso())
+        );
     }
 
     private int obtenerRutinaSentadillasId(Connection conn, int usuarioId, int diaSemana) throws SQLException {
@@ -899,14 +893,24 @@ public class TrainingAppService {
         String raw = rs.getString("nombre_rutina");
         if (raw != null && !raw.isBlank()) {
             try {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> data = objectMapper.readValue(raw, Map.class);
-                response.setHora(asInt(data.get("hora"), 9));
-                response.setMinuto(asInt(data.get("minuto"), 0));
-                response.setPeriodo(asString(data.get("periodo"), "AM"));
-                response.setDificultad(asString(data.get("dificultad"), "Media"));
-                response.setRepeticiones(asString(data.get("repeticiones"), "8 - 12"));
-                response.setPeso(asString(data.get("peso"), "12 kg"));
+                if (raw.startsWith("S|")) {
+                    Map<String, String> data = parseCompactSentadillasPlan(raw);
+                    response.setHora(asInt(data.get("h"), 9));
+                    response.setMinuto(asInt(data.get("m"), 0));
+                    response.setPeriodo(asString(data.get("p"), "AM"));
+                    response.setDificultad(asString(data.get("d"), "Media"));
+                    response.setRepeticiones(asString(data.get("r"), "8 - 12"));
+                    response.setPeso(asString(data.get("w"), "12 kg"));
+                } else {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> data = objectMapper.readValue(raw, Map.class);
+                    response.setHora(asInt(data.get("hora"), 9));
+                    response.setMinuto(asInt(data.get("minuto"), 0));
+                    response.setPeriodo(asString(data.get("periodo"), "AM"));
+                    response.setDificultad(asString(data.get("dificultad"), "Media"));
+                    response.setRepeticiones(asString(data.get("repeticiones"), "8 - 12"));
+                    response.setPeso(asString(data.get("peso"), "12 kg"));
+                }
             } catch (Exception e) {
                 response.setHora(9);
                 response.setMinuto(0);
@@ -935,6 +939,18 @@ public class TrainingAppService {
 
     private String asString(Object value, String fallback) {
         return value == null ? fallback : value.toString();
+    }
+
+    private Map<String, String> parseCompactSentadillasPlan(String raw) {
+        Map<String, String> data = new HashMap<>();
+        String[] parts = raw.split("\\|");
+        for (int i = 1; i < parts.length; i++) {
+            String[] keyValue = parts[i].split("=", 2);
+            if (keyValue.length == 2) {
+                data.put(keyValue[0], keyValue[1]);
+            }
+        }
+        return data;
     }
 
     private void guardarRepeticionesEnEjercicio(Connection conn, int ejercicioId, int repeticiones) throws SQLException {

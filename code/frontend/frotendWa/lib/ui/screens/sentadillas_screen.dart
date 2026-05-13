@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
 import '../../services/api_client.dart';
 import '../../services/workout_schedule_service.dart';
+import 'training_schedule_screen.dart';
 import '../widgets/responsive.dart';
 
 class SentadillasScreen extends StatefulWidget {
-  final int weekday;
+  final DateTime selectedDate;
 
-  const SentadillasScreen({super.key, required this.weekday});
+  const SentadillasScreen({super.key, required this.selectedDate});
 
   @override
   State<SentadillasScreen> createState() => _SentadillasScreenState();
@@ -20,6 +21,7 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
   int _selectedHour = 9;
   int _selectedMinute = 2;
   String _selectedPeriod = 'PM';
+  bool _isSaving = false;
 
   String _selectedDifficulty = 'Media';
   String _selectedRepetitions = '8 - 12';
@@ -98,7 +100,7 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                           children: [
                             Icon(Icons.calendar_today_outlined, color: AppColors.textSecondary, size: 18 * scale),
                             SizedBox(width: 8 * scale),
-                            Text(_weekdayLabels[(widget.weekday - 1).clamp(0, 6)], style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                            Text(_weekdayLabels[(widget.selectedDate.weekday - 1).clamp(0, 6)], style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                           ],
                         ),
                         SizedBox(height: 12 * scale),
@@ -210,7 +212,7 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                     width: double.infinity,
                     height: isCompact ? 54 * scale : 56 * scale,
                     child: ElevatedButton(
-                      onPressed: _guardarPlan,
+                      onPressed: _isSaving ? null : _guardarPlan,
                       style: ElevatedButton.styleFrom(
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28 * scale)),
@@ -223,14 +225,20 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                           borderRadius: BorderRadius.circular(28 * scale),
                         ),
                         child: Center(
-                          child: Text(
-                            'Guardar',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: Responsive.fs(context, isCompact ? 15 : 16),
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+                          child: _isSaving
+                              ? SizedBox(
+                                  width: 22 * scale,
+                                  height: 22 * scale,
+                                  child: const CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                                )
+                              : Text(
+                                  'Guardar',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: Responsive.fs(context, isCompact ? 15 : 16),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                         ),
                       ),
                     ),
@@ -245,29 +253,51 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
   }
 
   Future<void> _guardarPlan() async {
-    await _scheduleService.saveSentadillasPlan(
-      weekday: widget.weekday,
-      hour: _selectedHour,
-      minute: _selectedMinute,
-      period: _selectedPeriod,
-      difficulty: _selectedDifficulty,
-      repetitions: _selectedRepetitions,
-      weight: _selectedWeight,
-    );
+    setState(() => _isSaving = true);
+    try {
+      await _scheduleService.saveSentadillasPlan(
+        weekday: widget.selectedDate.weekday,
+        hour: _selectedHour,
+        minute: _selectedMinute,
+        period: _selectedPeriod,
+        difficulty: _selectedDifficulty,
+        repetitions: _selectedRepetitions,
+        weight: _selectedWeight,
+      );
 
-    if (!mounted) {
-      return;
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => TrainingScheduleScreen(
+            exerciseTitle: 'Sentadillas',
+            exerciseSubtitle: '3 series de 15 reps',
+            exerciseIcon: Icons.directions_run_rounded,
+            initialSelectedDate: widget.selectedDate,
+          ),
+        ),
+        (_) => false,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo guardar: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sentadillas guardadas en el horario')),
-    );
-    Navigator.pop(context);
   }
 
   Future<void> _loadExistingPlan() async {
     try {
-      final plan = await _scheduleService.loadSentadillasPlan(weekday: widget.weekday);
+      final plan = await _scheduleService.loadSentadillasPlan(weekday: widget.selectedDate.weekday);
       if (!mounted || plan == null) {
         return;
       }
