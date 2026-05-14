@@ -11,6 +11,7 @@ public class SentadillasPlanResponse {
     private String dificultad;
     private String repeticiones;
     private String peso;
+    private boolean completado;
 
     public SentadillasPlanResponse() {
     }
@@ -85,5 +86,13 @@ public class SentadillasPlanResponse {
 
     public void setPeso(String peso) {
         this.peso = peso;
+    }
+
+    public boolean isCompletado() {
+        return completado;
+    }
+
+    public void setCompletado(boolean completado) {
+        this.completado = completado;
     }
 }

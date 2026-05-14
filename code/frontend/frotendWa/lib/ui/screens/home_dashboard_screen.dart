@@ -452,21 +452,35 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
 
     final task = tasks[index];
     if (index == 0) {
-        Navigator.of(context)
-            .push(
-              MaterialPageRoute(
-                builder: (_) => SentadillasScreen(selectedDate: DateTime.now()),
-              ),
-            )
-            .then((_) => setState(() => _selectedTaskIndex = 0));
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute(
+              builder: (_) => SentadillasScreen(selectedDate: DateTime.now()),
+            ),
+          )
+          .then((_) => setState(() => _selectedTaskIndex = 0));
     } else if (index == 1) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PressHombrosScreen())).then((_) => setState(() => _selectedTaskIndex = 0));
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => PressHombrosScreen(selectedDate: DateTime.now())))
+          .then((_) => setState(() => _selectedTaskIndex = 0));
     } else if (index == 2) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FlexionUnaPiernaScreen())).then((_) => setState(() => _selectedTaskIndex = 0));
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => FlexionUnaPiernaScreen(selectedDate: DateTime.now())))
+          .then((_) => setState(() => _selectedTaskIndex = 0));
     } else if (index == 3) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RunningScreen())).then((_) => setState(() => _selectedTaskIndex = 0));
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => RunningScreen(selectedDate: DateTime.now())))
+          .then((_) => setState(() => _selectedTaskIndex = 0));
     } else {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => ExerciseDetailScreen(title: task['title'], subtitle: task['subtitle'], icon: task['icon'])));
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ExerciseDetailScreen(
+            title: task['title'] as String,
+            subtitle: task['subtitle'] as String,
+            icon: task['icon'] as IconData,
+          ),
+        ),
+      );
     }
   }
 

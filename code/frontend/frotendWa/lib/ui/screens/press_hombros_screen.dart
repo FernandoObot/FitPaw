@@ -2,19 +2,26 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
+import '../../services/api_client.dart';
+import '../../services/workout_schedule_service.dart';
 import '../widgets/responsive.dart';
+import 'training_schedule_screen.dart';
 
 class PressHombrosScreen extends StatefulWidget {
-  const PressHombrosScreen({super.key});
+  final DateTime selectedDate;
+
+  const PressHombrosScreen({super.key, required this.selectedDate});
 
   @override
   State<PressHombrosScreen> createState() => _PressHombrosScreenState();
 }
 
 class _PressHombrosScreenState extends State<PressHombrosScreen> {
+  final WorkoutScheduleService _scheduleService = WorkoutScheduleService(ApiClient());
   int _selectedHour = 9;
   int _selectedMinute = 2;
   String _selectedPeriod = 'PM';
+  bool _isSaving = false;
 
   String _selectedDifficulty = 'Media';
   String _selectedRepetitions = '8 - 12';
@@ -197,7 +204,7 @@ class _PressHombrosScreenState extends State<PressHombrosScreen> {
                     width: double.infinity,
                     height: isCompact ? 54 * scale : 56 * scale,
                     child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: _isSaving ? null : _guardarPlan,
                       style: ElevatedButton.styleFrom(
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28 * scale)),
@@ -229,6 +236,50 @@ class _PressHombrosScreenState extends State<PressHombrosScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _guardarPlan() async {
+    setState(() => _isSaving = true);
+    try {
+      await _scheduleService.saveExercisePlan(
+        exerciseName: 'Press de hombros',
+        weekday: widget.selectedDate.weekday,
+        hour: _selectedHour,
+        minute: _selectedMinute,
+        period: _selectedPeriod,
+        difficulty: _selectedDifficulty,
+        repetitions: _selectedRepetitions,
+        weight: _selectedWeight,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => TrainingScheduleScreen(
+            exerciseTitle: 'Press de hombros',
+            exerciseSubtitle: '3 series de 12 reps',
+            exerciseIcon: Icons.fitness_center_rounded,
+            initialSelectedDate: widget.selectedDate,
+          ),
+        ),
+        (_) => false,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo guardar: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   void _showTimePickerSheet() {

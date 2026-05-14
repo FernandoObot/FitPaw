@@ -93,11 +93,11 @@ class ExerciseDetailScreen extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () {
                         final Widget nextScreen = title == 'Correr'
-                          ? const RunningScreen()
+                          ? RunningScreen(selectedDate: DateTime.now())
                           : title == 'Press de hombros'
-                            ? const PressHombrosScreen()
+                            ? PressHombrosScreen(selectedDate: DateTime.now())
                             : title == 'Flexion de una pierna (con pesas)'
-                              ? const FlexionUnaPiernaScreen()
+                              ? FlexionUnaPiernaScreen(selectedDate: DateTime.now())
                               : TrainingScheduleScreen(exerciseTitle: title, exerciseSubtitle: subtitle, exerciseIcon: icon);
 
                         Navigator.of(context).push(MaterialPageRoute(builder: (_) => nextScreen));

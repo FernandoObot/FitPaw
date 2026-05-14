@@ -80,16 +80,24 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
   late DateTime _selectedDate;
   late DateTime _currentMonth;
   late DateTime _now;
+  Map<String, ExercisePlan> _ejercicios = {}; // Mapa unificado de nombre -> plan
+  bool _isLoadingSentadillas = true;
   String _selectedRoutineLabel = 'Cardio';
   String _selectedDifficultyLabel = 'Facil';
   String _selectedRepetitionsLabel = '8 - 12';
   String _selectedWeightLabel = '12 kg';
   final ScrollController _timelineController = ScrollController();
+  
+  // Lista de ejercicios genéricos para buscar
+  static const List<String> EJERCICIOS_GENERICOS = [
+    'Press de hombros',
+    'Flexión una pierna',
+    'Correr',
+  ];
   final ScrollController _monthController = ScrollController();
   Timer? _clockTimer;
   bool _didScrollToNow = false;
   int _selectedBottomIndex = 1;
-  SentadillasPlan? _sentadillasPlan;
 
   @override
   void initState() {
@@ -99,7 +107,7 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     _selectedDate = DateTime(initialDate.year, initialDate.month, initialDate.day);
     _currentMonth = DateTime(now.year, now.month, 1);
     _now = now;
-    _loadSentadillasPlan();
+    _loadExercisePlan();
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (!mounted) {
         return;
@@ -124,12 +132,71 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     super.dispose();
   }
 
-  Future<void> _loadSentadillasPlan() async {
-    final plan = await _scheduleService.loadSentadillasPlan(weekday: _selectedDate.weekday);
-    if (!mounted) {
-      return;
+  Future<void> _loadExercisePlan({DateTime? forDate}) async {
+    final date = forDate ?? _selectedDate;
+    
+    debugPrint('🔄 Cargando todos los ejercicios para ${date.weekday}');
+    
+    try {
+      setState(() => _isLoadingSentadillas = true);
+      
+      // Cargar todos los ejercicios en un mapa unificado
+      Map<String, ExercisePlan> nuevosEjercicios = {};
+      
+      // Cargar sentadillas
+      final SentadillasPlan? sentadillas = await _scheduleService.loadSentadillasPlan(
+        weekday: date.weekday,
+      );
+      if (!mounted) return;
+      
+      if (sentadillas != null) {
+        debugPrint('✅ Sentadillas cargadas: ${sentadillas.summaryLabel}');
+        // Convertir SentadillasPlan a ExercisePlan y agregarlo al mapa
+        final ExercisePlan sentadillasAsExercise = ExercisePlan(
+          weekday: sentadillas.weekday,
+          hour: sentadillas.hour,
+          minute: sentadillas.minute,
+          period: sentadillas.period,
+          difficulty: sentadillas.difficulty,
+          repetitions: sentadillas.repetitions,
+          weight: sentadillas.weight,
+          exerciseName: 'Sentadillas',
+          completed: sentadillas.completed,
+        );
+        nuevosEjercicios['Sentadillas'] = sentadillasAsExercise;
+      }
+      
+      // Cargar todos los ejercicios genéricos
+      for (String nombreEjercicio in EJERCICIOS_GENERICOS) {
+        try {
+          final ExercisePlan? plan = await _scheduleService.loadExercisePlan(
+            exerciseName: nombreEjercicio,
+            weekday: date.weekday,
+          );
+          if (plan != null) {
+            debugPrint('✅ $nombreEjercicio cargado: ${plan.summaryLabel}');
+            nuevosEjercicios[nombreEjercicio] = plan;
+          }
+        } catch (e) {
+          debugPrint('⚠️ No se pudo cargar $nombreEjercicio: $e');
+        }
+      }
+      
+      if (!mounted) return;
+      setState(() {
+        _ejercicios = nuevosEjercicios;
+        _isLoadingSentadillas = false;
+      });
+      
+      debugPrint('📊 Total ejercicios cargados: ${nuevosEjercicios.length}');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _isLoadingSentadillas = false);
+      debugPrint('❌ Error al cargar ejercicios: $error');
     }
-    setState(() => _sentadillasPlan = plan);
   }
 
   @override
@@ -155,7 +222,12 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
                         borderRadius: BorderRadius.circular(12 * scale),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12 * scale),
-                          onTap: () => Navigator.pop(context),
+                          onTap: () {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(builder: (context) => const HomeDashboardScreen()),
+                              (route) => false,
+                            );
+                          },
                           child: SizedBox(
                             width: 36 * scale,
                             height: 36 * scale,
@@ -276,11 +348,8 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
 
                         return GestureDetector(
                           onTap: () {
-                            setState(() {
-                              _selectedDate = day;
-                              _sentadillasPlan = null;
-                            });
-                            _loadSentadillasPlan();
+                            setState(() => _selectedDate = day);
+                            _loadExercisePlan(forDate: day);
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 220),
@@ -387,46 +456,39 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
                                               );
                                             },
                                             child: item == null
-                                                  ? SizedBox(height: 44 * scale)
-                                                  : Material(
-                                                      color: Colors.transparent,
-                                                      child: InkWell(
-                                                        borderRadius: BorderRadius.circular(24 * scale),
-                                                        onTap: null,
-                                                        child: Container(
-                                                          key: ValueKey<String>('${item.exercise}-${item.time}-${_selectedDate.toIso8601String()}'),
-                                                          width: double.infinity,
-                                                          padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
-                                                          decoration: BoxDecoration(
-                                                            color: item.color,
-                                                            borderRadius: BorderRadius.circular(24 * scale),
-                                                          ),
-                                                          child: Row(
-                                                            children: [
-                                                              Container(
-                                                                width: 10 * scale,
-                                                                height: 10 * scale,
-                                                                decoration: const BoxDecoration(
-                                                                  shape: BoxShape.circle,
-                                                                  color: Colors.white,
-                                                                ),
-                                                              ),
-                                                              SizedBox(width: 10 * scale),
-                                                              Expanded(
-                                                                child: Text(
-                                                                  item.exercise,
-                                                                  style: TextStyle(
-                                                                    color: Colors.white,
-                                                                    fontSize: Responsive.fs(context, 13),
-                                                                    fontWeight: FontWeight.w600,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ],
+                                                ? SizedBox(height: 44 * scale)
+                                                : Container(
+                                                    key: ValueKey<String>('${item.exercise}-${item.time}-${_selectedDate.toIso8601String()}'),
+                                                    width: double.infinity,
+                                                    padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
+                                                    decoration: BoxDecoration(
+                                                      color: item.color,
+                                                      borderRadius: BorderRadius.circular(24 * scale),
+                                                    ),
+                                                    child: Row(
+                                                      children: [
+                                                        Container(
+                                                          width: 10 * scale,
+                                                          height: 10 * scale,
+                                                          decoration: const BoxDecoration(
+                                                            shape: BoxShape.circle,
+                                                            color: Colors.white,
                                                           ),
                                                         ),
-                                                      ),
+                                                        SizedBox(width: 10 * scale),
+                                                        Expanded(
+                                                          child: Text(
+                                                            item.exercise,
+                                                            style: TextStyle(
+                                                              color: Colors.white,
+                                                              fontSize: Responsive.fs(context, 13),
+                                                              fontWeight: FontWeight.w600,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
+                                                  ),
                                           ),
                                           if (isCurrentSlot)
                                             Positioned(
@@ -948,117 +1010,46 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
 
   List<_ScheduleItem> _scheduleForDate(DateTime date) {
     final int weekday = date.weekday;
-    final _ScheduleItem? planItem = _buildSentadillasPlanItem(date);
+    List<_ScheduleItem> items = [];
 
+    // Agregar todos los ejercicios cargados del mapa unificado
+    for (var ejercicio in _ejercicios.values) {
+      items.add(_ScheduleItem(time: ejercicio.timeLabel, exercise: ejercicio.summaryLabel, color: const Color(0xFF70E0F0)));
+    }
+
+    // Si hay ejercicios cargados, retornarlos
+    if (items.isNotEmpty) {
+      return items;
+    }
+
+    // Si no hay ejercicios cargados, mostrar los defaults por día
     if (weekday == DateTime.monday) {
-      final items = <_ScheduleItem>[
+      return [
         _ScheduleItem(time: '07:00 AM', exercise: 'Abdomen, 7:30am', color: const Color(0xFF9DEFAF)),
         _ScheduleItem(time: '09:00 AM', exercise: widget.exerciseTitle, color: const Color(0xFF70E0F0)),
         _ScheduleItem(time: '03:00 PM', exercise: 'Biceps, 3pm', color: const Color(0xFFF5F2F5)),
       ];
-
-      if (planItem != null) {
-        _upsertScheduleItem(items, planItem);
-      }
-      return items;
     }
 
     if (weekday == DateTime.thursday) {
-      final items = <_ScheduleItem>[
+      return [
         _ScheduleItem(time: '07:30 AM', exercise: 'Abdomen, 7:30am', color: const Color(0xFF95F19B)),
         _ScheduleItem(time: '09:00 AM', exercise: 'Cuerpo bajo, 9am', color: const Color(0xFF86E9D7)),
         _ScheduleItem(time: '03:00 PM', exercise: 'Biceps, 3pm', color: const Color(0xFFF5F2F5)),
       ];
-
-      if (planItem != null) {
-        _upsertScheduleItem(items, planItem);
-      }
-      return items;
     }
 
     if (weekday == DateTime.friday) {
-      final items = <_ScheduleItem>[
+      return [
         _ScheduleItem(time: '08:00 AM', exercise: 'Pierna y core', color: const Color(0xFF95F19B)),
         _ScheduleItem(time: '11:00 AM', exercise: 'Cardio suave', color: const Color(0xFF70E0F0)),
       ];
-
-      if (planItem != null) {
-        _upsertScheduleItem(items, planItem);
-      }
-      return items;
     }
 
-    final items = <_ScheduleItem>[
+    return [
       _ScheduleItem(time: '09:00 AM', exercise: widget.exerciseTitle, color: const Color(0xFF9BEF9F)),
       _ScheduleItem(time: '03:00 PM', exercise: widget.exerciseSubtitle, color: const Color(0xFFF5F2F5)),
     ];
-
-    if (planItem != null) {
-      _upsertScheduleItem(items, planItem);
-    }
-    return items;
-  }
-
-  _ScheduleItem? _buildSentadillasPlanItem(DateTime date) {
-    final plan = _sentadillasPlan;
-    if (plan == null || plan.weekday != date.weekday || !widget.exerciseTitle.toLowerCase().contains('sentad')) {
-      return null;
-    }
-
-    return _ScheduleItem(
-      time: _nearestVisibleTimeLabel(plan.hour, plan.minute, plan.period),
-      exercise: plan.summaryLabel,
-      color: const Color(0xFF70E0F0),
-    );
-  }
-
-  String _nearestVisibleTimeLabel(int hour, int minute, String period) {
-    final int totalMinutes = (_normalizeHour(hour, period) * 60) + minute;
-    const int startMinutes = 6 * 60;
-    const int endMinutes = 20 * 60;
-    final int clamped = totalMinutes.clamp(startMinutes, endMinutes);
-    final int roundedHour = ((clamped + 30) ~/ 60).clamp(6, 20);
-    final String suffix = roundedHour >= 12 ? 'PM' : 'AM';
-    final int displayHour = roundedHour % 12 == 0 ? 12 : roundedHour % 12;
-    return '${displayHour.toString().padLeft(2, '0')}:00 $suffix';
-  }
-
-  int _normalizeHour(int hour, String period) {
-    final bool isPm = period.toUpperCase() == 'PM';
-    if (hour == 12) {
-      return isPm ? 12 : 0;
-    }
-    return isPm ? hour + 12 : hour;
-  }
-
-  void _upsertScheduleItem(List<_ScheduleItem> items, _ScheduleItem item) {
-    final int existingIndex = items.indexWhere((current) => current.time == item.time);
-    if (existingIndex >= 0) {
-      items[existingIndex] = item;
-      return;
-    }
-
-    items.add(item);
-    items.sort((left, right) => _timeIndex(left.time).compareTo(_timeIndex(right.time)));
-  }
-
-  int _timeIndex(String time) {
-    final index = _timeSlots.indexOf(time);
-    if (index >= 0) {
-      return index;
-    }
-
-    final parts = time.split(' ');
-    if (parts.length != 2) {
-      return _timeSlots.length;
-    }
-
-    final hm = parts[0].split(':');
-    final hour = int.tryParse(hm[0]) ?? 0;
-    final minute = int.tryParse(hm.length > 1 ? hm[1] : '0') ?? 0;
-    final isPm = parts[1].toUpperCase() == 'PM';
-    final normalizedHour = hour % 12 + (isPm ? 12 : 0);
-    return normalizedHour * 60 + minute;
   }
 
   String _monthYearTitle(DateTime date) {

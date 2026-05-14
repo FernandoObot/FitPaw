@@ -1,6 +1,6 @@
 package com.fitpaw.backend.controller;
 
-import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.function.Supplier;
 
@@ -19,12 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.fitpaw.backend.DTOs.CreateEjercicioRequest;
-import com.fitpaw.backend.DTOs.EjercicioCatalogoResponse;
-import com.fitpaw.backend.DTOs.EstadisticasResponse;
+import com.fitpaw.backend.DTOs.CompletarRutinaRequest;
 import com.fitpaw.backend.DTOs.OperacionResponse;
 import com.fitpaw.backend.DTOs.RegistroCorrerRequest;
-import com.fitpaw.backend.DTOs.RegistroCorrerResponse;
-import com.fitpaw.backend.DTOs.SerieFuerzaResponse;
 import com.fitpaw.backend.DTOs.UpdateEjercicioRequest;
 import com.fitpaw.backend.DTOs.CumplimientoMetaRequest;
 import com.fitpaw.backend.DTOs.SentadillasPlanRequest;
@@ -153,6 +150,41 @@ public class TrainingController {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         int usuarioId = (int) auth.getDetails();
         return run(() -> trainingAppService.obtenerSentadillasPlan(usuarioId, diaSemana), HttpStatus.OK);
+    }
+
+    @PostMapping("/rutinas/sentadillas/completar")
+    public ResponseEntity<?> marcarSentadillasCompletada(@RequestParam int diaSemana) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        int usuarioId = (int) auth.getDetails();
+        return run(() -> trainingAppService.marcarSentadillasCompletada(usuarioId, diaSemana), HttpStatus.OK);
+    }
+
+    @PostMapping("/rutinas/ejercicio")
+    public ResponseEntity<?> guardarEjercicio(@RequestBody Map<String, Object> body) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        int usuarioId = (int) auth.getDetails();
+        return run(() -> trainingAppService.guardarEjercicio(usuarioId, body), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/rutinas/ejercicio")
+    public ResponseEntity<?> obtenerEjercicio(@RequestParam String nombre, @RequestParam int diaSemana) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        int usuarioId = (int) auth.getDetails();
+        return run(() -> trainingAppService.obtenerEjercicio(usuarioId, nombre, diaSemana), HttpStatus.OK);
+    }
+
+    @PostMapping("/rutinas/completadas")
+    public ResponseEntity<?> completarRutina(@RequestBody CompletarRutinaRequest body) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        int usuarioId = (int) auth.getDetails();
+        return run(() -> trainingAppService.completarRutina(usuarioId, body), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/rutinas/completadas")
+    public ResponseEntity<?> listarRutinasCompletadas(@RequestParam int diaSemana) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        int usuarioId = (int) auth.getDetails();
+        return run(() -> trainingAppService.listarRutinasCompletadas(usuarioId, diaSemana), HttpStatus.OK);
     }
 
     private ResponseEntity<?> run(Supplier<Object> action, HttpStatus successStatus) {
