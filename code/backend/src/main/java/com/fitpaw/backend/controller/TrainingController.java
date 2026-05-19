@@ -187,6 +187,13 @@ public class TrainingController {
         return run(() -> trainingAppService.listarRutinasCompletadas(usuarioId, diaSemana), HttpStatus.OK);
     }
 
+    @DeleteMapping("/limpieza")
+    public ResponseEntity<?> limpiarCompletados() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        int usuarioId = (int) auth.getDetails();
+        return run(() -> trainingAppService.limpiarCompletadosDelUsuario(usuarioId), HttpStatus.OK);
+    }
+
     private ResponseEntity<?> run(Supplier<Object> action, HttpStatus successStatus) {
         try {
             return ResponseEntity.status(successStatus).body(action.get());

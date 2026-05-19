@@ -244,7 +244,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 onTap: () {
                                   setState(() => _selectedAccountIndex = 0);
                                   Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => const ActivityHistoryScreen()),
+                                    MaterialPageRoute(builder: (_) => const TrainingScheduleScreen(
+                                      exerciseTitle: 'Programa de entrenamiento',
+                                      exerciseSubtitle: 'Tu plan personalizado',
+                                      exerciseIcon: Icons.query_stats_rounded,
+                                    )),
                                   );
                                 },
                               ),
@@ -255,7 +259,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 onTap: () {
                                   setState(() => _selectedAccountIndex = 1);
                                   Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => const ProgressScreen()),
+                                    MaterialPageRoute(builder: (_) => const ActivityHistoryScreen()),
                                   );
                                 },
                               ),

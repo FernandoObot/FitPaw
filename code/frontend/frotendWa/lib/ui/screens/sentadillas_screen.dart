@@ -316,13 +316,27 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
   }
 
   void _showTimePickerSheet() {
-    final List<String> hours = List.generate(12, (i) => '${i + 1}');
+    // Generar lista de horas permitidas: 6 AM a 8 PM (6 a 20 en formato 24h)
+    final List<String> hours = [];
+    for (int i = 6; i <= 20; i++) {
+      int hour12 = i > 12 ? i - 12 : (i == 12 ? 12 : i);
+      String period = i >= 12 ? 'PM' : 'AM';
+      hours.add('$hour12 $period');
+    }
     final List<String> minutes = List.generate(60, (i) => i.toString().padLeft(2, '0'));
-    const List<String> periods = ['AM', 'PM'];
 
-    int selectedHour = _selectedHour;
+    // Convertir hora actual (12h con período) a índice en la lista 6-20
+    int currentHour24h = _selectedHour;
+    if (_selectedPeriod == 'PM' && _selectedHour != 12) {
+      currentHour24h += 12;
+    } else if (_selectedPeriod == 'AM' && _selectedHour == 12) {
+      currentHour24h = 0; // 12 AM = 0
+    }
+    // Asegurar que esté en rango 6-20
+    currentHour24h = currentHour24h.clamp(6, 20);
+    int selectedHourIndex = currentHour24h - 6; // índice 0-14
+
     int selectedMinute = _selectedMinute;
-    int selectedPeriod = _selectedPeriod == 'AM' ? 0 : 1;
 
     showModalBottomSheet<void>(
       context: context,
@@ -349,10 +363,16 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                           const Spacer(),
                           TextButton(
                             onPressed: () {
+                              // Convertir índice (0-14) a hora 24h (6-20)
+                              int hour24h = selectedHourIndex + 6;
+                              // Convertir a formato 12h con período
+                              int hour12 = hour24h > 12 ? hour24h - 12 : (hour24h == 0 ? 12 : hour24h);
+                              String period = hour24h >= 12 ? 'PM' : 'AM';
+                              
                               setState(() {
-                                _selectedHour = selectedHour;
+                                _selectedHour = hour12;
                                 _selectedMinute = selectedMinute;
-                                _selectedPeriod = periods[selectedPeriod];
+                                _selectedPeriod = period;
                               });
                               Navigator.pop(context);
                             },
@@ -367,8 +387,8 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                           Expanded(
                             child: CupertinoPicker(
                               itemExtent: 36 * scale,
-                              scrollController: FixedExtentScrollController(initialItem: selectedHour - 1),
-                              onSelectedItemChanged: (index) => setModalState(() => selectedHour = index + 1),
+                              scrollController: FixedExtentScrollController(initialItem: selectedHourIndex),
+                              onSelectedItemChanged: (index) => setModalState(() => selectedHourIndex = index),
                               children: hours.map((value) => Center(child: Text(value, style: TextStyle(fontSize: Responsive.fs(context, 18))))).toList(),
                             ),
                           ),
@@ -378,14 +398,6 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                               scrollController: FixedExtentScrollController(initialItem: selectedMinute),
                               onSelectedItemChanged: (index) => setModalState(() => selectedMinute = index),
                               children: minutes.map((value) => Center(child: Text(value, style: TextStyle(fontSize: Responsive.fs(context, 18))))).toList(),
-                            ),
-                          ),
-                          Expanded(
-                            child: CupertinoPicker(
-                              itemExtent: 36 * scale,
-                              scrollController: FixedExtentScrollController(initialItem: selectedPeriod),
-                              onSelectedItemChanged: (index) => setModalState(() => selectedPeriod = index),
-                              children: periods.map((value) => Center(child: Text(value, style: TextStyle(fontSize: Responsive.fs(context, 18))))).toList(),
                             ),
                           ),
                         ],

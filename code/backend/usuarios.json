@@ -1,0 +1,152 @@
+﻿{
+    "value":  [
+                  {
+                      "usuario_id":  1,
+                      "nickname":  "Jonathan",
+                      "telefono":  "2721236563",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-02T15:41:06.128663"
+                  },
+                  {
+                      "usuario_id":  2,
+                      "nickname":  "Test",
+                      "telefono":  "1234567890",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-04T20:09:10.179319"
+                  },
+                  {
+                      "usuario_id":  3,
+                      "nickname":  "Test User",
+                      "telefono":  "1555000001",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-05T20:32:37.923255"
+                  },
+                  {
+                      "usuario_id":  5,
+                      "nickname":  "TestUser1778124910",
+                      "telefono":  "3014567890",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-06T21:35:11.121003"
+                  },
+                  {
+                      "usuario_id":  6,
+                      "nickname":  "DemoFitPaw1778245038",
+                      "telefono":  "3078245038",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-08T06:57:19.243929"
+                  },
+                  {
+                      "usuario_id":  7,
+                      "nickname":  "TestRefactor",
+                      "telefono":  "3019876543",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-08T21:05:19.891853"
+                  },
+                  {
+                      "usuario_id":  8,
+                      "nickname":  "TestCorrerEjercicio",
+                      "telefono":  "3109999999",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-09T07:31:22.797048"
+                  },
+                  {
+                      "usuario_id":  9,
+                      "nickname":  "Usuario Prueba FitPaw",
+                      "telefono":  "999000000",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-09T21:48:31.533144"
+                  },
+                  {
+                      "usuario_id":  11,
+                      "nickname":  "Usuario Racha Prueba",
+                      "telefono":  "9385568886",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-09T21:59:29.856459"
+                  },
+                  {
+                      "usuario_id":  12,
+                      "nickname":  "Usuario Racha Prueba 2355",
+                      "telefono":  "9385642355",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-09T22:00:43.418831"
+                  },
+                  {
+                      "usuario_id":  13,
+                      "nickname":  "Usuario Racha Prueba 6789",
+                      "telefono":  "9385676789",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-09T22:01:17.749391"
+                  },
+                  {
+                      "usuario_id":  14,
+                      "nickname":  "Usuario Racha Prueba 1713",
+                      "telefono":  "9386071713",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-09T22:07:52.794741"
+                  },
+                  {
+                      "usuario_id":  15,
+                      "nickname":  "Test Correr 0164",
+                      "telefono":  "9508790164",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-10T08:22:41.406575"
+                  },
+                  {
+                      "usuario_id":  16,
+                      "nickname":  "Test Correr Distancia",
+                      "telefono":  "9990001234",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-10T08:29:09.654275"
+                  },
+                  {
+                      "usuario_id":  17,
+                      "nickname":  "Wa Mili",
+                      "telefono":  "6573422237",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-11T06:37:53.311027"
+                  },
+                  {
+                      "usuario_id":  18,
+                      "nickname":  "Octac",
+                      "telefono":  "8786654409",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-11T06:40:49.411163"
+                  },
+                  {
+                      "usuario_id":  19,
+                      "nickname":  "WaWaWa",
+                      "telefono":  "7573433390",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-12T05:38:15.696064"
+                  },
+                  {
+                      "usuario_id":  20,
+                      "nickname":  "FeFefe",
+                      "telefono":  "8859546612",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-12T05:40:33.719605"
+                  },
+                  {
+                      "usuario_id":  21,
+                      "nickname":  "WWWAA",
+                      "telefono":  "2625337855",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-12T05:44:25.24199"
+                  },
+                  {
+                      "usuario_id":  22,
+                      "nickname":  "Val",
+                      "telefono":  "2722223344",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-12T06:29:34.140805"
+                  },
+                  {
+                      "usuario_id":  23,
+                      "nickname":  "Fernando Guti",
+                      "telefono":  "2343335566",
+                      "rol":  "USER",
+                      "fecha_registro":  "2026-05-14T05:37:01.299019"
+                  }
+              ],
+    "Count":  21
+}

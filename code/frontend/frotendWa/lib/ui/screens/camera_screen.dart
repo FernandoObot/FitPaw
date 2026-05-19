@@ -1,8 +1,14 @@
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_colors.dart';
+import '../../services/app_services.dart';
+import '../../services/api_client.dart';
 import '../widgets/responsive.dart';
 import 'home_dashboard_screen.dart';
 import 'pet_screen.dart';
@@ -19,15 +25,93 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen> {
   final ImagePicker _imagePicker = ImagePicker();
-  List<XFile?> _todayPhotos = [null, null, null];
-  
-  // Simulamos un historial de fotos por día
-  final Map<String, List<XFile>> _photoHistory = {
-    '2 de junio': [],
-    '5 de mayo': [],
-  };
+  Uint8List? _todayPhoto;
+  List<String?> _recentComparisonPhotos = [null, null, null];
+  List<String?> _oldComparisonPhotos = [null, null, null];
+  List<_StoredPhoto> _allComparisonPhotos = [];
+  bool _loadingComparisonPhotos = true;
+  String? _comparisonError;
 
-  Future<void> _takePicture(int index) async {
+  @override
+  void initState() {
+    super.initState();
+    _loadComparisonPhotos();
+  }
+
+  Future<void> _loadComparisonPhotos() async {
+    try {
+      await apiClient.loadToken();
+      final response = await apiClient.get('/fotos-progreso');
+
+      if (response.statusCode != 200) {
+        throw Exception('No se pudieron cargar las fotos guardadas');
+      }
+
+      final decoded = jsonDecode(response.body);
+      final List<dynamic> rawPhotos = decoded is List<dynamic> ? decoded : <dynamic>[];
+      final cutoff = DateTime.now().subtract(const Duration(days: 30));
+
+      final photos = rawPhotos
+          .whereType<Map<String, dynamic>>()
+          .map((photo) {
+            final fechaRaw = photo['fecha']?.toString();
+            return _StoredPhoto(
+              urlFoto: photo['urlFoto']?.toString() ?? '',
+              fecha: fechaRaw != null ? DateTime.tryParse(fechaRaw) : null,
+            );
+          })
+          .where((photo) => photo.urlFoto.isNotEmpty)
+          .toList()
+        ..sort((a, b) {
+          final aFecha = a.fecha ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bFecha = b.fecha ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return aFecha.compareTo(bFecha);
+        });
+
+      // Store full list sorted by fecha DESC for the "Ver más" view
+      final allPhotosDesc = List<_StoredPhoto>.from(photos)
+        ..sort((a, b) {
+          final aFecha = a.fecha ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bFecha = b.fecha ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bFecha.compareTo(aFecha);
+        });
+
+        final oldUrls = photos
+          .where((photo) => photo.fecha == null || photo.fecha!.isBefore(cutoff))
+          .take(3)
+          .map((photo) => photo.urlFoto)
+          .toList();
+
+        final recentUrls = photos
+          .where((photo) => photo.fecha != null && !photo.fecha!.isBefore(cutoff))
+          .take(3)
+          .map((photo) => photo.urlFoto)
+          .toList();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _oldComparisonPhotos = oldUrls;
+        _recentComparisonPhotos = recentUrls;
+        _allComparisonPhotos = allPhotosDesc;
+        _loadingComparisonPhotos = false;
+        _comparisonError = null;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _loadingComparisonPhotos = false;
+        _comparisonError = 'No se pudieron cargar las fotos de comparación';
+      });
+    }
+  }
+
+  Future<void> _takePicture() async {
     try {
       late XFile? photo;
       
@@ -45,14 +129,43 @@ class _CameraScreenState extends State<CameraScreen> {
       }
       
       if (photo != null) {
+        final bytes = await photo.readAsBytes();
         setState(() {
-          _todayPhotos[index] = photo;
-          // Agregar al historial de hoy
-          _photoHistory['2 de junio']!.add(photo!);
+          _todayPhoto = bytes;
         });
+
+        await _uploadCapturedPhoto(photo, bytes);
+        await _loadComparisonPhotos();
       }
     } catch (e) {
       print('Error taking picture: $e');
+    }
+  }
+
+  Future<void> _uploadCapturedPhoto(XFile photo, Uint8List bytes) async {
+    await apiClient.loadToken();
+    final token = apiClient.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('No hay sesión activa para subir la foto');
+    }
+
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiClient.baseUrl}/fotos-progreso'),
+    );
+    request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'foto',
+        bytes,
+        filename: photo.name.isNotEmpty ? photo.name : 'captura.jpg',
+      ),
+    );
+
+    final response = await request.send();
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      final body = await response.stream.bytesToString();
+      throw Exception('No se pudo guardar la foto: ${response.statusCode} $body');
     }
   }
   
@@ -94,58 +207,97 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             ),
             Expanded(
-              child: SingleChildScrollView(
+              child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16 * scale),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: Responsive.phoneWidth(context)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: _photoHistory.entries.map((entry) {
-                        final date = entry.key;
-                        final photos = entry.value;
-                        
-                        if (photos.isEmpty) {
-                          return SizedBox.shrink();
-                        }
-                        
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              date,
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: Responsive.fs(context, 12),
-                                fontWeight: FontWeight.w500,
+                    child: _allComparisonPhotos.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: EdgeInsets.only(top: 24 * scale),
+                              child: Text(
+                                'No hay fotos disponibles',
+                                style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.fs(context, 14)),
                               ),
                             ),
-                            SizedBox(height: 8 * scale),
-                            GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
+                          )
+                        : LayoutBuilder(builder: (context, constraints) {
+                            final width = constraints.maxWidth;
+                            final int crossAxisCount = width >= 600 ? 4 : (width >= 400 ? 3 : 2);
+
+                            return GridView.builder(
+                              padding: EdgeInsets.only(top: 8 * scale, bottom: 24 * scale),
                               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
+                                crossAxisCount: crossAxisCount,
                                 crossAxisSpacing: 10 * scale,
                                 mainAxisSpacing: 10 * scale,
-                                childAspectRatio: 1,
+                                childAspectRatio: 0.82,
                               ),
-                              itemCount: photos.length,
+                              itemCount: _allComparisonPhotos.length,
                               itemBuilder: (context, index) {
-                                return ClipRRect(
-                                  borderRadius: BorderRadius.circular(14 * scale),
-                                  child: Image.file(
-                                    photos[index].path as dynamic,
-                                    fit: BoxFit.cover,
+                                final photo = _allComparisonPhotos[index];
+                                return GestureDetector(
+                                  onTap: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (_) => Dialog(
+                                        insetPadding: EdgeInsets.all(16 * scale),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            AspectRatio(
+                                              aspectRatio: 1,
+                                              child: Image.network(photo.urlFoto, fit: BoxFit.cover),
+                                            ),
+                                            Padding(
+                                              padding: EdgeInsets.all(8 * scale),
+                                              child: Text(
+                                                _formatPhotoDate(photo.fecha),
+                                                style: TextStyle(
+                                                  color: AppColors.textSecondary,
+                                                  fontSize: Responsive.fs(context, 12),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      Expanded(
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(14 * scale),
+                                          child: Image.network(
+                                            photo.urlFoto,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => Center(
+                                              child: Icon(Icons.broken_image_outlined, color: AppColors.mintPrimary, size: 36 * scale),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(height: 6 * scale),
+                                      Text(
+                                        _formatPhotoDate(photo.fecha),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: Responsive.fs(context, 10),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 );
                               },
-                            ),
-                            SizedBox(height: 16 * scale),
-                          ],
-                        );
-                      }).toList(),
-                    ),
+                            );
+                          }),
                   ),
                 ),
               ),
@@ -200,35 +352,25 @@ class _CameraScreenState extends State<CameraScreen> {
                     ],
                   ),
                   SizedBox(height: 8 * scale),
-                  Text(
-                    'Hoy',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: Responsive.fs(context, 12),
-                      fontWeight: FontWeight.w500,
+                  Center(
+                    child: Column(
+                      children: [
+                        _InteractivePhotoPlaceholder(
+                          size: 112 * scale,
+                          photoBytes: _todayPhoto,
+                          onTap: _takePicture,
+                        ),
+                        SizedBox(height: 8 * scale),
+                        Text(
+                          'Toca para tomar una foto',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: Responsive.fs(context, 12),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  SizedBox(height: 8 * scale),
-                  Row(
-                    children: [
-                      _InteractivePhotoPlaceholder(
-                        size: 92 * scale,
-                        photoFile: _todayPhotos[0],
-                        onTap: () => _takePicture(0),
-                      ),
-                      SizedBox(width: 10 * scale),
-                      _InteractivePhotoPlaceholder(
-                        size: 92 * scale,
-                        photoFile: _todayPhotos[1],
-                        onTap: () => _takePicture(1),
-                      ),
-                      SizedBox(width: 10 * scale),
-                      _InteractivePhotoPlaceholder(
-                        size: 92 * scale,
-                        photoFile: _todayPhotos[2],
-                        onTap: () => _takePicture(2),
-                      ),
-                    ],
                   ),
                   SizedBox(height: 24 * scale),
                   Center(
@@ -243,6 +385,42 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                   SizedBox(height: 14 * scale),
                   Text(
+                    'Fotos recientes',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: Responsive.fs(context, 12),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(height: 8 * scale),
+                  if (_loadingComparisonPhotos)
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16 * scale),
+                      child: const CircularProgressIndicator(),
+                    )
+                  else if (_comparisonError != null)
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8 * scale),
+                      child: Text(
+                        _comparisonError!,
+                        style: TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: Responsive.fs(context, 12),
+                        ),
+                      ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        _InteractivePhotoPlaceholder(size: 92 * scale, imageUrl: _recentComparisonPhotos[0]),
+                        SizedBox(width: 10 * scale),
+                        _InteractivePhotoPlaceholder(size: 92 * scale, imageUrl: _recentComparisonPhotos[1]),
+                        SizedBox(width: 10 * scale),
+                        _InteractivePhotoPlaceholder(size: 92 * scale, imageUrl: _recentComparisonPhotos[2]),
+                      ],
+                    ),
+                  SizedBox(height: 14 * scale),
+                  Text(
                     'Hace tiempo',
                     style: TextStyle(
                       color: AppColors.textSecondary,
@@ -253,11 +431,11 @@ class _CameraScreenState extends State<CameraScreen> {
                   SizedBox(height: 8 * scale),
                   Row(
                     children: [
-                      _PhotoPlaceholder(size: 92 * scale),
+                      _InteractivePhotoPlaceholder(size: 92 * scale, imageUrl: _oldComparisonPhotos[0]),
                       SizedBox(width: 10 * scale),
-                      _PhotoPlaceholder(size: 92 * scale),
+                      _InteractivePhotoPlaceholder(size: 92 * scale, imageUrl: _oldComparisonPhotos[1]),
                       SizedBox(width: 10 * scale),
-                      _PhotoPlaceholder(size: 92 * scale),
+                      _InteractivePhotoPlaceholder(size: 92 * scale, imageUrl: _oldComparisonPhotos[2]),
                     ],
                   ),
                       ],
@@ -295,13 +473,15 @@ class _PhotoPlaceholder extends StatelessWidget {
 class _InteractivePhotoPlaceholder extends StatefulWidget {
   const _InteractivePhotoPlaceholder({
     required this.size,
-    required this.onTap,
-    required this.photoFile,
+    this.photoBytes,
+    this.imageUrl,
+    this.onTap,
   });
 
   final double size;
-  final VoidCallback onTap;
-  final XFile? photoFile;
+  final VoidCallback? onTap;
+  final Uint8List? photoBytes;
+  final String? imageUrl;
 
   @override
   State<_InteractivePhotoPlaceholder> createState() => _InteractivePhotoPlaceholderState();
@@ -351,7 +531,7 @@ class _InteractivePhotoPlaceholderState extends State<_InteractivePhotoPlacehold
             width: widget.size,
             height: widget.size,
             decoration: BoxDecoration(
-              color: widget.photoFile != null ? Colors.grey[300] : const Color(0xFFE8E8E8),
+              color: (widget.photoBytes != null || widget.imageUrl != null) ? Colors.grey[300] : const Color(0xFFE8E8E8),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: _isHovered ? AppColors.mintPrimary : Colors.transparent,
@@ -367,12 +547,33 @@ class _InteractivePhotoPlaceholderState extends State<_InteractivePhotoPlacehold
                     ]
                   : [],
             ),
-            child: widget.photoFile != null
+            child: widget.photoBytes != null
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(14),
-                    child: Image.file(
-                      widget.photoFile!.path as dynamic,
+                    child: Image.memory(
+                      widget.photoBytes!,
                       fit: BoxFit.cover,
+                      width: widget.size,
+                      height: widget.size,
+                    ),
+                  )
+                : widget.imageUrl != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.network(
+                      widget.imageUrl!,
+                      fit: BoxFit.cover,
+                      width: widget.size,
+                      height: widget.size,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Center(
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            color: AppColors.mintPrimary,
+                            size: widget.size * 0.35,
+                          ),
+                        );
+                      },
                     ),
                   )
                 : Center(
@@ -387,6 +588,26 @@ class _InteractivePhotoPlaceholderState extends State<_InteractivePhotoPlacehold
       ),
     );
   }
+}
+
+class _StoredPhoto {
+  const _StoredPhoto({required this.urlFoto, required this.fecha});
+
+  final String urlFoto;
+  final DateTime? fecha;
+}
+
+String _formatPhotoDate(DateTime? dateTime) {
+  if (dateTime == null) {
+    return '';
+  }
+
+  final day = dateTime.day.toString().padLeft(2, '0');
+  final month = dateTime.month.toString().padLeft(2, '0');
+  final year = dateTime.year.toString();
+  final hour = dateTime.hour.toString().padLeft(2, '0');
+  final minute = dateTime.minute.toString().padLeft(2, '0');
+  return '$day/$month/$year $hour:$minute';
 }
 
 class _BottomNavBar extends StatelessWidget {

@@ -81,6 +81,7 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
   late DateTime _currentMonth;
   late DateTime _now;
   Map<String, ExercisePlan> _ejercicios = {}; // Mapa unificado de nombre -> plan
+  Set<String> _ejerciciosCompletados = {}; // Ejercicios marcados como completados
   bool _isLoadingSentadillas = true;
   String _selectedRoutineLabel = 'Cardio';
   String _selectedDifficultyLabel = 'Facil';
@@ -182,13 +183,25 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
         }
       }
       
+      // Cargar ejercicios completados
+      Set<String> completados = {};
+      try {
+        completados = await _scheduleService.loadCompletedExercises(
+          weekday: date.weekday,
+        );
+        debugPrint('📋 Ejercicios completados: $completados');
+      } catch (e) {
+        debugPrint('⚠️ No se pudieron cargar los completados: $e');
+      }
+      
       if (!mounted) return;
       setState(() {
         _ejercicios = nuevosEjercicios;
+        _ejerciciosCompletados = completados;
         _isLoadingSentadillas = false;
       });
       
-      debugPrint('📊 Total ejercicios cargados: ${nuevosEjercicios.length}');
+      debugPrint('📊 Total ejercicios cargados: ${nuevosEjercicios.length}, completados: ${completados.length}');
     } catch (error) {
       if (!mounted) {
         return;
@@ -457,36 +470,55 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
                                             },
                                             child: item == null
                                                 ? SizedBox(height: 44 * scale)
-                                                : Container(
-                                                    key: ValueKey<String>('${item.exercise}-${item.time}-${_selectedDate.toIso8601String()}'),
-                                                    width: double.infinity,
-                                                    padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
-                                                    decoration: BoxDecoration(
-                                                      color: item.color,
-                                                      borderRadius: BorderRadius.circular(24 * scale),
-                                                    ),
-                                                    child: Row(
-                                                      children: [
-                                                        Container(
-                                                          width: 10 * scale,
-                                                          height: 10 * scale,
-                                                          decoration: const BoxDecoration(
-                                                            shape: BoxShape.circle,
-                                                            color: Colors.white,
-                                                          ),
+                                                : GestureDetector(
+                                                    onTap: item.exerciseName != null
+                                                        ? () => _showMarkCompleteDialog(item.exerciseName!)
+                                                        : null,
+                                                    child: Container(
+                                                      key: ValueKey<String>('${item.exercise}-${item.time}-${_selectedDate.toIso8601String()}'),
+                                                      width: double.infinity,
+                                                      padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
+                                                      decoration: BoxDecoration(
+                                                        color: item.color.withValues(
+                                                          alpha: item.isCompleted ? 0.4 : 1.0,
                                                         ),
-                                                        SizedBox(width: 10 * scale),
-                                                        Expanded(
-                                                          child: Text(
-                                                            item.exercise,
-                                                            style: TextStyle(
-                                                              color: Colors.white,
-                                                              fontSize: Responsive.fs(context, 13),
-                                                              fontWeight: FontWeight.w600,
+                                                        borderRadius: BorderRadius.circular(24 * scale),
+                                                      ),
+                                                      child: Row(
+                                                        children: [
+                                                          Container(
+                                                            width: 10 * scale,
+                                                            height: 10 * scale,
+                                                            decoration: BoxDecoration(
+                                                              shape: BoxShape.circle,
+                                                              color: item.isCompleted
+                                                                  ? const Color(0xFF4CAF50)
+                                                                  : Colors.white,
+                                                            ),
+                                                            child: item.isCompleted
+                                                                ? Icon(
+                                                                    Icons.check,
+                                                                    color: Colors.white,
+                                                                    size: 6 * scale,
+                                                                  )
+                                                                : null,
+                                                          ),
+                                                          SizedBox(width: 10 * scale),
+                                                          Expanded(
+                                                            child: Text(
+                                                              item.exercise,
+                                                              style: TextStyle(
+                                                                color: Colors.white,
+                                                                fontSize: Responsive.fs(context, 13),
+                                                                fontWeight: FontWeight.w600,
+                                                                decoration: item.isCompleted
+                                                                    ? TextDecoration.lineThrough
+                                                                    : TextDecoration.none,
+                                                              ),
                                                             ),
                                                           ),
-                                                        ),
-                                                      ],
+                                                        ],
+                                                      ),
                                                     ),
                                                   ),
                                           ),
@@ -657,6 +689,59 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     });
   }
 
+  void _showMarkCompleteDialog(String exerciseName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Marcar como completado'),
+          content: Text('¿Deseas marcar "$exerciseName" como completado?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await _markExerciseComplete(exerciseName);
+              },
+              child: const Text('Sí, completado'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _markExerciseComplete(String exerciseName) async {
+    try {
+      debugPrint('📝 Marcando $exerciseName como completado para día ${_selectedDate.weekday}');
+      
+      await _scheduleService.markRoutineCompleted(
+        weekday: _selectedDate.weekday,
+        exerciseLabel: exerciseName,
+      );
+      
+      debugPrint('✅ $exerciseName marcado como completado');
+      
+      // Recargar los ejercicios para actualizar la UI
+      if (!mounted) return;
+      await _loadExercisePlan(forDate: _selectedDate);
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$exerciseName marcado como completado')),
+      );
+    } catch (e) {
+      debugPrint('❌ Error al marcar $exerciseName como completado: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
   void _showAddExerciseSheet() {
     // Only allow the full 'Horario por dia' sheet for Sentadillas.
     if (!widget.exerciseTitle.toLowerCase().contains('sentad')) {
@@ -670,20 +755,33 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
       isScrollControlled: true,
       builder: (context) {
         final double scale = Responsive.scale(context);
-        final List<String> hours = List.generate(12, (i) => '${i + 1}');
+        // Rango permitido: 6 AM a 8 PM (6 a 20 en formato 24h)
+        // Generar lista de horas de 6 AM a 8 PM con formato correcto
+        final List<String> hours = [];
+        for (int i = 6; i <= 20; i++) {
+          int hour12 = i > 12 ? i - 12 : (i == 12 ? 12 : i);
+          String period = i >= 12 ? 'PM' : 'AM';
+          hours.add('$hour12 $period');
+        }
         final List<String> minutes = List.generate(60, (i) => i.toString().padLeft(2, '0'));
-        final List<String> periods = ['AM', 'PM'];
 
-        int initialHour = (_now.hour % 12 == 0) ? 12 : _now.hour % 12;
-        int initialMinute = _now.minute;
-        int initialPeriodIndex = _now.hour >= 12 ? 1 : 0;
+        // Hora actual
+        int now24Hour = _now.hour;
+        int nowMinute = _now.minute;
+        
+        // Validar que la hora actual esté dentro del rango permitido (6 AM - 8 PM)
+        if (now24Hour < 6) now24Hour = 6; // Si es antes de 6 AM, poner 6 AM
+        if (now24Hour >= 20) now24Hour = 20; // Si es 8 PM o después, poner 8 PM
+        
+        int initialMinute = nowMinute;
+        // Índice inicial de la hora en el picker (0-14 para 6-20)
+        int initialHourIndex = now24Hour - 6;
 
         return StatefulBuilder(builder: (context, setState) {
           final bool isMobile = MediaQuery.of(context).size.width < 600;
 
-          int selectedHour = initialHour;
+          int selectedHourIndex = initialHourIndex; // Índice 0-14 que corresponde a horas 6-20
           int selectedMinute = initialMinute;
-          int selectedPeriod = initialPeriodIndex;
 
           Widget detailItem({
             required String title,
@@ -836,8 +934,8 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
                                   child: CupertinoPicker(
                                     backgroundColor: Colors.white,
                                     itemExtent: 32 * scale,
-                                    scrollController: FixedExtentScrollController(initialItem: selectedHour - 1),
-                                    onSelectedItemChanged: (index) => setState(() => selectedHour = index + 1),
+                                    scrollController: FixedExtentScrollController(initialItem: selectedHourIndex),
+                                    onSelectedItemChanged: (index) => setState(() => selectedHourIndex = index),
                                     children: hours
                                         .map(
                                           (value) => Center(
@@ -854,21 +952,6 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
                                     scrollController: FixedExtentScrollController(initialItem: selectedMinute),
                                     onSelectedItemChanged: (index) => setState(() => selectedMinute = index),
                                     children: minutes
-                                        .map(
-                                          (value) => Center(
-                                            child: Text(value, style: TextStyle(fontSize: Responsive.fs(context, 18), color: AppColors.textPrimary)),
-                                          ),
-                                        )
-                                        .toList(),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: CupertinoPicker(
-                                    backgroundColor: Colors.white,
-                                    itemExtent: 32 * scale,
-                                    scrollController: FixedExtentScrollController(initialItem: selectedPeriod),
-                                    onSelectedItemChanged: (index) => setState(() => selectedPeriod = index),
-                                    children: periods
                                         .map(
                                           (value) => Center(
                                             child: Text(value, style: TextStyle(fontSize: Responsive.fs(context, 18), color: AppColors.textPrimary)),
@@ -1013,8 +1096,17 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     List<_ScheduleItem> items = [];
 
     // Agregar todos los ejercicios cargados del mapa unificado
-    for (var ejercicio in _ejercicios.values) {
-      items.add(_ScheduleItem(time: ejercicio.timeLabel, exercise: ejercicio.summaryLabel, color: const Color(0xFF70E0F0)));
+    for (var entry in _ejercicios.entries) {
+      final String nombre = entry.key;
+      final ExercisePlan ejercicio = entry.value;
+      final bool isCompleted = _ejerciciosCompletados.contains(nombre);
+      items.add(_ScheduleItem(
+        time: ejercicio.timeLabel,
+        exercise: ejercicio.summaryLabel,
+        color: const Color(0xFF70E0F0),
+        exerciseName: nombre,
+        isCompleted: isCompleted,
+      ));
     }
 
     // Si hay ejercicios cargados, retornarlos
@@ -1169,11 +1261,15 @@ class _ScheduleItem {
   final String time;
   final String exercise;
   final Color color;
+  final String? exerciseName; // Nombre del ejercicio para marcar como completado
+  final bool isCompleted; // Si está marcado como completado
 
   _ScheduleItem({
     required this.time,
     required this.exercise,
     required this.color,
+    this.exerciseName,
+    this.isCompleted = false,
   });
 }
 

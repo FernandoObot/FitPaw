@@ -1,10 +1,17 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://localhost:8080';
+  static final String baseUrl = _getBaseUrl();
   static const String _tokenKey = 'jwt_token';
+  
+  static String _getBaseUrl() {
+    return kIsWeb
+        ? 'http://127.0.0.1:8080'
+        : 'http://192.168.1.68:8080';
+  }
   
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   String? _token;

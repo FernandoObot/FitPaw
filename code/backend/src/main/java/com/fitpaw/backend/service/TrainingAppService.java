@@ -126,7 +126,7 @@ public class TrainingAppService {
 
                 String sql = "SELECT rutina_id, usuario_id, nombre_rutina, dia_semana, COALESCE(completado, false) AS completado "
                     + "FROM public.progreso_rutinas_personalizadas "
-                    + "WHERE usuario_id = ? AND dia_semana = ? ORDER BY rutina_id DESC LIMIT 1";
+                    + "WHERE usuario_id = ? AND dia_semana = ? AND nombre_rutina LIKE 'S|%' ORDER BY rutina_id DESC LIMIT 1";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, usuarioId);
                 ps.setInt(2, diaSemana);
@@ -881,8 +881,9 @@ public class TrainingAppService {
     }
 
     private int obtenerRutinaSentadillasId(Connection conn, int usuarioId, int diaSemana) throws SQLException {
+        // IMPORTANTE: Filtrar solo por registros que comienzan con "S|" (Sentadillas)
         String sql = "SELECT rutina_id FROM public.progreso_rutinas_personalizadas "
-                + "WHERE usuario_id = ? AND dia_semana = ? ORDER BY rutina_id DESC LIMIT 1";
+                + "WHERE usuario_id = ? AND dia_semana = ? AND nombre_rutina LIKE 'S|%' ORDER BY rutina_id DESC LIMIT 1";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, usuarioId);
             ps.setInt(2, diaSemana);
@@ -944,9 +945,10 @@ public class TrainingAppService {
             asegurarCompatibilidadSentadillas(conn);
             validarUsuarioExiste(conn, usuarioId);
 
+            // IMPORTANTE: Filtrar solo por registros que comienzan con "S|" (Sentadillas)
             String sql = "UPDATE public.progreso_rutinas_personalizadas "
                     + "SET completado = true, completado_en = NOW() "
-                    + "WHERE usuario_id = ? AND dia_semana = ? RETURNING rutina_id";
+                    + "WHERE usuario_id = ? AND dia_semana = ? AND nombre_rutina LIKE 'S|%' RETURNING rutina_id";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, usuarioId);
                 ps.setInt(2, diaSemana);
@@ -1226,6 +1228,13 @@ public class TrainingAppService {
     }
 
     private void asegurarCompatibilidadRutinasCompletadas(Connection conn) throws SQLException {
+        // Crear secuencia si no existe
+        String sequenceSql = "CREATE SEQUENCE IF NOT EXISTS public.progreso_rutinas_completadas_completado_id_seq "
+                + "START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1";
+        try (PreparedStatement ps = conn.prepareStatement(sequenceSql)) {
+            ps.execute();
+        }
+
         String sql = "CREATE TABLE IF NOT EXISTS public.progreso_rutinas_completadas ("
                 + "completado_id integer NOT NULL DEFAULT nextval('progreso_rutinas_completadas_completado_id_seq'::regclass),"
                 + "usuario_id integer,"
@@ -1295,6 +1304,25 @@ public class TrainingAppService {
             ps.setString(1, DIFICULTAD_PREFIX + dificultad);
             ps.setInt(2, ejercicioId);
             ps.executeUpdate();
+        }
+    }
+
+    public OperacionResponse limpiarCompletadosDelUsuario(int usuarioId) {
+        validarUsuarioId(usuarioId);
+        
+        try (Connection conn = conexionDB.conectar()) {
+            String sql = "DELETE FROM public.progreso_rutinas_completadas WHERE usuario_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, usuarioId);
+                int rowsDeleted = ps.executeUpdate();
+                return new OperacionResponse(
+                    "ok",
+                    "DELETE /training/limpieza",
+                    "Se eliminaron " + rowsDeleted + " registros completados"
+                );
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al limpiar completados: " + e.getMessage());
         }
     }
 }
