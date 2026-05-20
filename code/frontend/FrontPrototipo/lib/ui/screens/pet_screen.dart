@@ -1,0 +1,1072 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '../../core/app_colors.dart';
+import '../widgets/responsive.dart';
+
+class PetScreen extends StatefulWidget {
+  const PetScreen({super.key});
+
+  @override
+  State<PetScreen> createState() => _PetScreenState();
+}
+
+  String _foodAssetForKey(String key) {
+    switch (key) {
+      case 'pez':
+        return 'assets/images/Pez.png';
+      case 'camaron':
+        return 'assets/images/Camaron.png';
+      case 'calamar':
+        return 'assets/images/Calamar.png';
+      case 'coctel':
+        return 'assets/images/Coctel de mariscos.png';
+      default:
+        return 'assets/images/Pez.png';
+    }
+  }
+
+class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMixin {
+  static const String _defaultBase = 'assets/images/basico base.png';
+  static const String _defaultHappy = 'assets/images/basico feliz.png';
+  static const String _defaultSad = 'assets/images/basico triste.png';
+  static const String _defaultCry = 'assets/images/basico llorando.png';
+  static const String _conjunto1Base = 'assets/images/conjunto 1 base.png';
+  static const String _conjunto1Happy = 'assets/images/conjunto 1 feliz.png';
+  static const String _conjunto1Sad = 'assets/images/conjunto 1 triste.png';
+  static const String _conjunto1Cry = 'assets/images/conjunto 1 llorando.png';
+  static const String _conjunto2Base = 'assets/images/conjunto 2 base.png';
+  static const String _conjunto2Happy = 'assets/images/conjunto 2 feliz.png';
+  static const String _conjunto2Sad = 'assets/images/conjunto 2 triste.png';
+  static const String _conjunto2Cry = 'assets/images/conjunto 2 llorando.png';
+
+  int _selectedActionIndex = 0;
+  String _petName = 'Pingui';
+  bool _isEditingName = false;
+  late final TextEditingController _nameController;
+  final FocusNode _nameFocus = FocusNode();
+  final math.Random _random = math.Random();
+  AnimationController? _snowController;
+  List<_Snowflake>? _flakes;
+  Timer? _happyTimer;
+  final List<Timer> _hungerTimers = [];
+  // Tracks which food is being thrown for the feeding animation (null = none)
+  Timer? _throwFoodTimer;
+  
+  String? _throwFoodKey;
+  // Food counts for each food type (frontend only)
+  final Map<String, int> _foodCounts = {
+    'pez': 5,
+    'camaron': 5,
+    'calamar': 5,
+    'coctel': 5,
+  };
+  double _foodLevel = 100;
+  String _statusMessage = '';
+  String _penguinAsset = _defaultHappy;
+  // Which outfit is applied: null = none, 0 = conjunto1, 1 = conjunto2
+  int? _appliedConjunto;
+  
+
+  static const List<String> _feedMessages = [
+    'que rico',
+    'super peces!',
+    'delicioso',
+  ];
+
+  void _ensureSnow() {
+    if (_snowController != null && _flakes != null) {
+      return;
+    }
+
+    _snowController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    )..repeat();
+
+    final math.Random random = math.Random(17);
+    _flakes = List.generate(42, (index) {
+      return _Snowflake(
+        x: random.nextDouble(),
+        y: random.nextDouble(),
+        radius: 1.2 + random.nextDouble() * 2.6,
+        speed: 0.18 + random.nextDouble() * 0.38,
+        drift: (random.nextDouble() * 2 - 1) * 0.06,
+      );
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: _petName);
+    _ensureSnow();
+    _scheduleHungerTimers();
+    _updatePenguinByLevel();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ensureSnow();
+  }
+
+  @override
+  void dispose() {
+    _snowController?.dispose();
+    _happyTimer?.cancel();
+    _cancelHungerTimers();
+    _throwFoodTimer?.cancel();
+    _nameController.dispose();
+    _nameFocus.dispose();
+    super.dispose();
+  }
+
+  void _selectAction(int index) {
+    setState(() => _selectedActionIndex = index);
+  }
+
+  void _cancelHungerTimers() {
+    for (final Timer timer in _hungerTimers) {
+      timer.cancel();
+    }
+    _hungerTimers.clear();
+  }
+
+  void _scheduleHungerTimers() {
+    _cancelHungerTimers();
+
+    _hungerTimers.addAll([
+      Timer(const Duration(seconds: 10), () {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _foodLevel = 75);
+        _updatePenguinByLevel();
+      }),
+      Timer(const Duration(seconds: 15), () {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _foodLevel = 50);
+        _updatePenguinByLevel();
+      }),
+      Timer(const Duration(seconds: 20), () {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _foodLevel = 25);
+        _updatePenguinByLevel();
+      }),
+      Timer(const Duration(seconds: 25), () {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _foodLevel = 0);
+        _updatePenguinByLevel();
+      }),
+    ]);
+  }
+
+  void _updatePenguinByLevel() {
+    if (!mounted) {
+      return;
+    }
+
+    String nextAsset;
+    String nextStatus = '';
+
+    if (_appliedConjunto != null) {
+      if (_appliedConjunto == 0) {
+        if (_foodLevel <= 0) {
+          nextAsset = _conjunto1Cry;
+        } else if (_foodLevel <= 25) {
+          nextAsset = _conjunto1Sad;
+        } else {
+          nextAsset = _conjunto1Base;
+        }
+      } else if (_appliedConjunto == 1) {
+        if (_foodLevel <= 0) {
+          nextAsset = _conjunto2Cry;
+        } else if (_foodLevel <= 25) {
+          nextAsset = _conjunto2Sad;
+        } else {
+          nextAsset = _conjunto2Base;
+        }
+      } else {
+        nextAsset = _defaultHappy;
+      }
+    } else {
+      if (_foodLevel <= 0) {
+        nextAsset = _defaultCry;
+      } else if (_foodLevel <= 25) {
+        nextAsset = _defaultSad;
+      } else {
+        nextAsset = _defaultBase;
+      }
+    }
+
+    if (_foodLevel <= 0) {
+      nextStatus = 'deberias alimentarme';
+    } else if (_foodLevel <= 25) {
+      nextStatus = 'tengo hambre';
+    } else if (_foodLevel < 75) {
+      nextStatus = 'se me antojan unos peces';
+    }
+
+    setState(() {
+      _penguinAsset = nextAsset;
+      _statusMessage = nextStatus;
+    });
+  }
+
+  
+  void _triggerFoodThrow(String key) {
+    _throwFoodTimer?.cancel();
+    setState(() => _throwFoodKey = key);
+    _throwFoodTimer = Timer(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      setState(() => _throwFoodKey = null);
+    });
+  }
+  void _feedPet(String foodKey) {
+    final int available = _foodCounts[foodKey] ?? 0;
+    if (available <= 0) {
+      setState(() {
+        _statusMessage = 'No hay más de ese alimento';
+      });
+      return;
+    }
+    _triggerFoodThrow(foodKey);
+    _happyTimer?.cancel();
+
+    setState(() {
+      _foodCounts[foodKey] = available - 1;
+      _foodLevel = (_foodLevel + 25).clamp(0, 100).toDouble();
+      if (_appliedConjunto == 0) {
+        _penguinAsset = _conjunto1Happy;
+      } else if (_appliedConjunto == 1) {
+        _penguinAsset = _conjunto2Happy;
+      } else {
+        _penguinAsset = _defaultHappy;
+      }
+      _statusMessage = _feedMessages[_random.nextInt(_feedMessages.length)];
+    });
+
+    _scheduleHungerTimers();
+
+    _happyTimer = Timer(const Duration(milliseconds: 900), () {
+      _updatePenguinByLevel();
+    });
+  }
+
+  void _openCloset() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+            return _ClosetSheet(
+          scale: Responsive.scale(context),
+          appliedConjunto: _appliedConjunto,
+          onApply: (index) {
+            // allow applying conjunto 0 or 1
+            setState(() {
+              _appliedConjunto = index;
+              if (index == 0) {
+                _penguinAsset = _conjunto1Base;
+              } else if (index == 1) {
+                _penguinAsset = _conjunto2Base;
+              }
+            });
+            _updatePenguinByLevel();
+          },
+          onRemove: (index) {
+            // remove any applied outfit
+            setState(() {
+              _appliedConjunto = null;
+              _penguinAsset = _defaultHappy;
+            });
+            _updatePenguinByLevel();
+          },
+        );
+      },
+    );
+  }
+
+  void _openFoodMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final double scale = Responsive.scale(context);
+        final Map<String, String> assetMap = {
+          'pez': 'assets/images/Pez.png',
+          'camaron': 'assets/images/Camaron.png',
+          'calamar': 'assets/images/Calamar.png',
+          'coctel': 'assets/images/Coctel de mariscos.png',
+        };
+
+        
+
+        return SafeArea(
+          child: LayoutBuilder(builder: (context, constraints) {
+            final double maxSheetHeight = constraints.maxHeight * 0.78;
+            return Align(
+              alignment: Alignment.bottomCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: maxSheetHeight,
+                  maxWidth: Responsive.phoneWidth(context),
+                ),
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 24 * scale),
+                  padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 18 * scale),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24 * scale),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 24 * scale,
+                        offset: Offset(0, 12 * scale),
+                      ),
+                    ],
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Menu de comida',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: Responsive.fs(context, 18),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 16 * scale),
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: 4,
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 12 * scale,
+                            crossAxisSpacing: 12 * scale,
+                            childAspectRatio: 1,
+                          ),
+                          itemBuilder: (context, index) {
+                            final List<Map<String, String>> items = [
+                              {'key': 'pez', 'label': 'Pez', 'asset': assetMap['pez'] ?? ''},
+                              {'key': 'camaron', 'label': 'Camaron', 'asset': assetMap['camaron'] ?? ''},
+                              {'key': 'calamar', 'label': 'Calamar', 'asset': assetMap['calamar'] ?? ''},
+                              {'key': 'coctel', 'label': 'Coctel', 'asset': assetMap['coctel'] ?? ''},
+                            ];
+
+                            final item = items[index];
+                            return _buildFoodTile(context, scale, item['label']!, item['asset'], item['key']!);
+                          },
+                        ),
+                        SizedBox(height: 8 * scale),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: Text(
+                              'Cerrar',
+                              style: TextStyle(
+                                color: AppColors.blueSecondary,
+                                fontSize: Responsive.fs(context, 13),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+
+  
+
+  Widget _buildFoodTile(BuildContext context, double scale, String label, String? asset, String key) {
+    final int count = _foodCounts[key] ?? 0;
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).pop();
+        _feedPet(key);
+      },
+      borderRadius: BorderRadius.circular(16 * scale),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16 * scale),
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.fieldBackground.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(16 * scale),
+                border: Border.all(color: AppColors.blueSecondary.withValues(alpha: 0.4), width: 1 * scale),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16 * scale),
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(8 * scale),
+                    child: SizedBox(
+                      height: (88 * scale).clamp(56, 140),
+                      child: asset != null
+                          ? Image.asset(
+                              asset,
+                              fit: BoxFit.contain,
+                              errorBuilder: (c, e, s) => Center(child: Icon(Icons.fastfood, size: 40 * scale)),
+                            )
+                          : Icon(Icons.fastfood, size: 40 * scale, color: AppColors.mintPrimary),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 8 * scale,
+              top: 8 * scale,
+              child: Container(
+                width: (36 * scale).clamp(28, 48),
+                height: (36 * scale).clamp(28, 48),
+                decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: const Color(0xFFECECEC))),
+                child: Center(child: Text('$count', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+              ),
+            ),
+            // label is omitted to match Closet tiles (image fills the block)
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _toggleNameEditing() {
+    if (_isEditingName) {
+      final String nextName = _nameController.text.trim();
+      if (nextName.isNotEmpty) {
+        setState(() => _petName = nextName);
+      }
+      setState(() => _isEditingName = false);
+      _nameFocus.unfocus();
+    } else {
+      setState(() => _isEditingName = true);
+      _nameController
+        ..text = _petName
+        ..selection = TextSelection(baseOffset: 0, extentOffset: _petName.length);
+      _nameFocus.requestFocus();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _ensureSnow();
+    final double scale = Responsive.scale(context);
+
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: Responsive.phoneWidth(context)),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/Fondo de mascota.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        decoration: const BoxDecoration(gradient: AppColors.splashGradient),
+                      );
+                    },
+                  ),
+                ),
+                Column(
+                  children: [
+                    SizedBox(height: 8 * scale),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12 * scale),
+                      child: Row(
+                        children: [
+                          Material(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            borderRadius: BorderRadius.circular(12 * scale),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12 * scale),
+                              onTap: () => Navigator.of(context).pop(),
+                              child: SizedBox(
+                                width: 42 * scale,
+                                height: 42 * scale,
+                                child: Icon(
+                                  Icons.arrow_back_ios_new_rounded,
+                                  size: 20 * scale,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12 * scale),
+                          Expanded(
+                            child: _isEditingName
+                                ? TextField(
+                                    focusNode: _nameFocus,
+                                    controller: _nameController,
+                                    textAlign: TextAlign.center,
+                                    textCapitalization: TextCapitalization.words,
+                                    onSubmitted: (_) => _toggleNameEditing(),
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      border: InputBorder.none,
+                                      hintText: 'Nombre de tu mascota',
+                                    ),
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: Responsive.fs(context, 18),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  )
+                                : Text(
+                                    _petName,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: Responsive.fs(context, 18),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                          ),
+                          Material(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            borderRadius: BorderRadius.circular(12 * scale),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12 * scale),
+                              onTap: _toggleNameEditing,
+                              child: SizedBox(
+                                width: 42 * scale,
+                                height: 42 * scale,
+                                child: Icon(
+                                  Icons.edit_rounded,
+                                  size: 20 * scale,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (_statusMessage.isNotEmpty)
+                            Container(
+                              margin: EdgeInsets.only(bottom: 8 * scale),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12 * scale,
+                                vertical: 6 * scale,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.82),
+                                borderRadius: BorderRadius.circular(16 * scale),
+                              ),
+                              child: Text(
+                                _statusMessage,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: Responsive.fs(context, 12),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Transform.translate(
+                                offset: Offset(0, 170 * scale),
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 350),
+                                  child: Image.asset(
+                                    _penguinAsset,
+                                    key: ValueKey<String>(_penguinAsset),
+                                    width: 190 * scale,
+                                    height: 220 * scale,
+                                    fit: BoxFit.contain,
+                                    alignment: Alignment.bottomCenter,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                left: 0 * scale,
+                                bottom: 56 * scale,
+                                child: AnimatedSlide(
+                                  duration: const Duration(milliseconds: 700),
+                                  curve: Curves.easeOut,
+                                  offset: _throwFoodKey != null ? const Offset(0.95, -1.05) : const Offset(0, 0.35),
+                                  child: AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 700),
+                                            opacity: _throwFoodKey != null ? 1 : 0,
+                                            child: IgnorePointer(
+                                              child: _throwFoodKey != null
+                                                  ? Image.asset(
+                                                      _foodAssetForKey(_throwFoodKey!),
+                                                      width: 70 * scale,
+                                                      fit: BoxFit.contain,
+                                                    )
+                                                  : const SizedBox.shrink(),
+                                            ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 200 * scale),
+                          Text(
+                            'Comida',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: Responsive.fs(context, 14),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          SizedBox(height: 6 * scale),
+                          Container(
+                            width: 220 * scale,
+                            height: 16 * scale,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                return Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 800),
+                                    curve: Curves.easeOut,
+                                    width: constraints.maxWidth * (_foodLevel / 100),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [Color(0xFFFF6B6B), Color(0xFFFF5252)],
+                                        begin: Alignment.centerLeft,
+                                        end: Alignment.centerRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          SizedBox(height: 12 * scale),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.only(bottom: 36 * scale),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _PetActionButton(
+                            icon: Icons.restaurant_rounded,
+                            isSelected: _selectedActionIndex == 0,
+                            scale: scale,
+                            onTap: () {
+                              _selectAction(0);
+                              _openFoodMenu();
+                            },
+                          ),
+                          SizedBox(width: 18 * scale),
+                          _PetActionButton(
+                            icon: Icons.checkroom_rounded,
+                            isSelected: _selectedActionIndex == 1,
+                            scale: scale,
+                              onTap: () {
+                                _selectAction(1);
+                                _openCloset();
+                              },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _snowController!,
+                      builder: (context, child) {
+                        return CustomPaint(
+                          painter: _SnowPainter(
+                            flakes: _flakes!,
+                            progress: _snowController!.value,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Snowflake {
+  const _Snowflake({
+    required this.x,
+    required this.y,
+    required this.radius,
+    required this.speed,
+    required this.drift,
+  });
+
+  final double x;
+  final double y;
+  final double radius;
+  final double speed;
+  final double drift;
+}
+
+class _SnowPainter extends CustomPainter {
+  const _SnowPainter({
+    required this.flakes,
+    required this.progress,
+  });
+
+  final List<_Snowflake> flakes;
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.72)
+      ..style = PaintingStyle.fill;
+
+    for (final _Snowflake flake in flakes) {
+      final double y = (flake.y + progress * flake.speed) % 1.0;
+      double x = (flake.x + progress * flake.drift) % 1.0;
+      if (x < 0) {
+        x += 1.0;
+      }
+      canvas.drawCircle(
+        Offset(x * size.width, y * size.height),
+        flake.radius,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SnowPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.flakes != flakes;
+  }
+}
+
+class _PetActionButton extends StatelessWidget {
+  const _PetActionButton({
+    required this.icon,
+    required this.isSelected,
+    required this.scale,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool isSelected;
+  final double scale;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final double size = (isSelected ? 64 : 58) * scale;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: AppColors.primaryGradient,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.blueSecondary.withValues(alpha: isSelected ? 0.35 : 0.22),
+              blurRadius: (isSelected ? 18 : 12) * scale,
+              offset: Offset(0, 8 * scale),
+            ),
+          ],
+          border: isSelected
+              ? Border.all(color: Colors.white.withValues(alpha: 0.9), width: 2 * scale)
+              : null,
+        ),
+        child: Icon(icon, color: Colors.white, size: 28 * scale),
+      ),
+    );
+  }
+}
+
+class _ClosetSheet extends StatefulWidget {
+  const _ClosetSheet({
+    required this.scale,
+    required this.appliedConjunto,
+    this.onApply,
+    this.onRemove,
+  });
+
+  final double scale;
+  // currently applied conjunto index (null = none)
+  final int? appliedConjunto;
+  final void Function(int)? onApply;
+  final void Function(int)? onRemove;
+
+  @override
+  State<_ClosetSheet> createState() => _ClosetSheetState();
+}
+
+class _ClosetSheetState extends State<_ClosetSheet> {
+  int? _lockedMessageIndex;
+  int? _appliedConjunto;
+  // conjunto actualmente seleccionado en el modal (null = ninguno)
+  int? _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _appliedConjunto = widget.appliedConjunto;
+  }
+
+  void _handleLockedTap(int index) {
+    setState(() => _lockedMessageIndex = index);
+  }
+
+  void _handleSelect(int index) {
+    setState(() {
+      _selectedIndex = index;
+      // clear any locked message when selecting an unlocked tile
+      _lockedMessageIndex = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double scale = widget.scale;
+    const List<String> outfitImages = [
+      'assets/images/conjunto 1 base.png',
+      'assets/images/conjunto 2.png',
+      'assets/images/conjunto 3.png',
+      'assets/images/conjunto 4.png',
+      'assets/images/conjunto 5.png',
+    ];
+
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final double maxSheetHeight = constraints.maxHeight * 0.78;
+          return Align(
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: maxSheetHeight,
+                maxWidth: Responsive.phoneWidth(context),
+              ),
+              child: Container(
+                margin: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 24 * scale),
+                padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 18 * scale),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24 * scale),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 24 * scale,
+                      offset: Offset(0, 12 * scale),
+                    ),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(
+                    'Closet',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: Responsive.fs(context, 18),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 4 * scale),
+                  Text(
+                    'Selecciona un conjunto (5 espacios).',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: Responsive.fs(context, 12),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(height: 16 * scale),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: 5,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12 * scale,
+                      crossAxisSpacing: 12 * scale,
+                      childAspectRatio: 1,
+                    ),
+                    itemBuilder: (context, index) {
+                      // unlock only the first two conjuntos (0 and 1)
+                      final bool isLocked = index > 1;
+                      final String imagePath = outfitImages[index];
+
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(16 * scale),
+                        onTap: isLocked
+                            ? () => _handleLockedTap(index)
+                            : () => _handleSelect(index),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16 * scale),
+                          child: Stack(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.fieldBackground.withValues(alpha: 0.8),
+                                  borderRadius: BorderRadius.circular(16 * scale),
+                                    border: Border.all(
+                                    color: index == _appliedConjunto
+                                        ? AppColors.mintPrimary
+                                        : AppColors.blueSecondary.withValues(alpha: 0.4),
+                                    width: 1 * scale,
+                                  ),
+                                ),
+                                child: imagePath.isNotEmpty
+                                    ? SizedBox.expand(
+                                        child: Image.asset(
+                                          imagePath,
+                                          fit: BoxFit.cover,
+                                          alignment: Alignment.center,
+                                        ),
+                                      )
+                                    : Center(
+                                        child: Text(
+                                          'Conjunto ${index + 1}',
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: Responsive.fs(context, 12),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                              if (isLocked)
+                                Container(
+                                  color: Colors.white.withValues(alpha: 0.55),
+                                ),
+                              if (isLocked && _lockedMessageIndex == index)
+                                Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(12 * scale),
+                                    child: Text(
+                                      'Obten esta recompensa realizando tus metas',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: Responsive.fs(context, 11),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              // Mostrar botón Aplicar/Quitar dentro del cuadro si está seleccionado y desbloqueado
+                              if (!isLocked && _selectedIndex == index)
+                                Positioned(
+                                  left: 8 * scale,
+                                  right: 8 * scale,
+                                  bottom: 8 * scale,
+                                  child: SizedBox(
+                                    height: 36 * scale,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          if (_appliedConjunto == index) {
+                                            _appliedConjunto = null;
+                                            widget.onRemove?.call(index);
+                                            return;
+                                          }
+                                          _appliedConjunto = index;
+                                          widget.onApply?.call(index);
+                                        });
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: _appliedConjunto == index
+                                            ? Colors.white
+                                            : AppColors.mintPrimary,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12 * scale),
+                                        ),
+                                        elevation: 2 * scale,
+                                      ),
+                                      child: Text(
+                                        _appliedConjunto == index ? 'Quitar' : 'Aplicar',
+                                        style: TextStyle(
+                                          color: _appliedConjunto == index ? AppColors.textPrimary : Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(height: 8 * scale),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(
+                        'Cerrar',
+                        style: TextStyle(
+                          color: AppColors.blueSecondary,
+                          fontSize: Responsive.fs(context, 13),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
