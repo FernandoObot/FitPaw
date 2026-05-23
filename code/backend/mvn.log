@@ -172,3 +172,52 @@ Conectado a Supabase (FitPaw)
 2026-05-23T14:30:54.996-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-2] o.s.security.web.FilterChainProxy        : Securing POST /training/rutinas/sentadillas
 2026-05-23T14:30:54.997-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-2] o.s.security.web.FilterChainProxy        : Secured POST /training/rutinas/sentadillas
 Conectado a Supabase (FitPaw)
+2026-05-23T14:47:13.907-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-3] o.s.security.web.FilterChainProxy        : Securing OPTIONS /training/rutinas/sentadillas?diaSemana=6
+2026-05-23T14:47:13.916-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-4] o.s.security.web.FilterChainProxy        : Securing GET /training/rutinas/sentadillas?diaSemana=6
+2026-05-23T14:47:13.918-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-4] o.s.security.web.FilterChainProxy        : Secured GET /training/rutinas/sentadillas?diaSemana=6
+Conectado a Supabase (FitPaw)
+2026-05-23T14:47:28.263-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-5] o.s.security.web.FilterChainProxy        : Securing OPTIONS /ejercicios/fuerza
+2026-05-23T14:47:28.267-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-6] o.s.security.web.FilterChainProxy        : Securing POST /ejercicios/fuerza
+2026-05-23T14:47:28.270-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-6] o.s.security.web.FilterChainProxy        : Secured POST /ejercicios/fuerza
+Conectado a Supabase (FitPaw)
+2026-05-23T14:47:29.422-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-7] o.s.security.web.FilterChainProxy        : Securing OPTIONS /training/rutinas/sentadillas?diaSemana=6
+2026-05-23T14:47:29.426-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-8] o.s.security.web.FilterChainProxy        : Securing GET /training/rutinas/sentadillas?diaSemana=6
+2026-05-23T14:47:29.428-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-8] o.s.security.web.FilterChainProxy        : Secured GET /training/rutinas/sentadillas?diaSemana=6
+Conectado a Supabase (FitPaw)
+2026-05-23T14:47:35.175-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-9] o.s.security.web.FilterChainProxy        : Securing OPTIONS /auth/profile/me
+2026-05-23T14:47:35.178-06:00 DEBUG 62654 --- [backend] [io-8080-exec-10] o.s.security.web.FilterChainProxy        : Securing GET /auth/profile/me
+2026-05-23T14:47:35.179-06:00 DEBUG 62654 --- [backend] [io-8080-exec-10] o.s.security.web.FilterChainProxy        : Secured GET /auth/profile/me
+Conectado a Supabase (FitPaw)
+2026-05-23T14:47:41.911-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-1] o.s.security.web.FilterChainProxy        : Securing OPTIONS /ejercicios/fuerza
+2026-05-23T14:47:41.921-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-2] o.s.security.web.FilterChainProxy        : Securing POST /ejercicios/fuerza
+2026-05-23T14:47:41.924-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-2] o.s.security.web.FilterChainProxy        : Secured POST /ejercicios/fuerza
+Conectado a Supabase (FitPaw)
+2026-05-23T14:47:42.974-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-3] o.s.security.web.FilterChainProxy        : Securing OPTIONS /training/rutinas/sentadillas?diaSemana=6
+2026-05-23T14:47:42.976-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-4] o.s.security.web.FilterChainProxy        : Securing GET /training/rutinas/sentadillas?diaSemana=6
+2026-05-23T14:47:42.978-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-4] o.s.security.web.FilterChainProxy        : Secured GET /training/rutinas/sentadillas?diaSemana=6
+Conectado a Supabase (FitPaw)
+2026-05-23T14:47:56.099-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-5] o.s.security.web.FilterChainProxy        : Securing OPTIONS /auth/profile/me
+2026-05-23T14:47:56.102-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-6] o.s.security.web.FilterChainProxy        : Securing GET /auth/profile/me
+2026-05-23T14:47:56.104-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-6] o.s.security.web.FilterChainProxy        : Secured GET /auth/profile/me
+Conectado a Supabase (FitPaw)
+2026-05-23T14:48:06.950-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-7] o.s.security.web.FilterChainProxy        : Securing OPTIONS /training/rutinas/sentadillas?diaSemana=6
+2026-05-23T14:48:06.953-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-8] o.s.security.web.FilterChainProxy        : Securing GET /training/rutinas/sentadillas?diaSemana=6
+2026-05-23T14:48:06.961-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-8] o.s.security.web.FilterChainProxy        : Secured GET /training/rutinas/sentadillas?diaSemana=6
+Conectado a Supabase (FitPaw)
+2026-05-23T14:48:13.032-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-9] o.s.security.web.FilterChainProxy        : Securing OPTIONS /training/rutinas/sentadillas
+2026-05-23T14:48:13.036-06:00 DEBUG 62654 --- [backend] [io-8080-exec-10] o.s.security.web.FilterChainProxy        : Securing POST /training/rutinas/sentadillas
+2026-05-23T14:48:13.037-06:00 DEBUG 62654 --- [backend] [io-8080-exec-10] o.s.security.web.FilterChainProxy        : Secured POST /training/rutinas/sentadillas
+Conectado a Supabase (FitPaw)
+2026-05-23T14:48:37.572-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-1] o.s.security.web.FilterChainProxy        : Securing OPTIONS /training/rutinas/sentadillas?diaSemana=6
+2026-05-23T14:48:37.575-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-2] o.s.security.web.FilterChainProxy        : Securing GET /training/rutinas/sentadillas?diaSemana=6
+2026-05-23T14:48:37.576-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-2] o.s.security.web.FilterChainProxy        : Secured GET /training/rutinas/sentadillas?diaSemana=6
+Conectado a Supabase (FitPaw)
+2026-05-23T14:48:38.521-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-3] o.s.security.web.FilterChainProxy        : Securing OPTIONS /training/rutinas/sentadillas
+2026-05-23T14:48:38.524-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-4] o.s.security.web.FilterChainProxy        : Securing POST /training/rutinas/sentadillas
+2026-05-23T14:48:38.526-06:00 DEBUG 62654 --- [backend] [nio-8080-exec-4] o.s.security.web.FilterChainProxy        : Secured POST /training/rutinas/sentadillas
+Conectado a Supabase (FitPaw)
+2026-05-23T15:01:46.756-06:00  INFO 62654 --- [backend] [ionShutdownHook] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-05-23T15:01:46.766-06:00  INFO 62654 --- [backend] [tomcat-shutdown] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-05-23T15:01:46.784-06:00  INFO 62654 --- [backend] [ionShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-05-23T15:01:46.798-06:00  INFO 62654 --- [backend] [ionShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-05-23T15:01:47.753-06:00  INFO 62654 --- [backend] [ionShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.

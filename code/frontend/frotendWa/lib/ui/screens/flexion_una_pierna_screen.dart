@@ -250,8 +250,12 @@ class _FlexionUnaPiernaScreenState extends State<FlexionUnaPiernaScreen> {
       }
 
       // Extraer repeticiones (tomar el máximo de "8 - 12" → 12)
-      List<String> repParts = _selectedRepetitions.split(' - ');
-      int repeticiones = int.parse(repParts.last.trim());
+      int repeticiones;
+      try {
+        repeticiones = int.parse(RegExp(r'\d+').firstMatch(_selectedRepetitions)!.group(0)!);
+      } catch (e) {
+        repeticiones = 0; // fallback si no se encuentra número
+      }
 
       // Extraer peso (de "12 kg" → 12.0)
       double peso = double.parse(_selectedWeight.split(' ')[0]);

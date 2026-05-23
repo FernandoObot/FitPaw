@@ -255,14 +255,34 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
   Future<void> _guardarPlan() async {
     setState(() => _isSaving = true);
     try {
-      await _scheduleService.saveSentadillasPlan(
-        weekday: widget.selectedDate.weekday,
-        hour: _selectedHour,
-        minute: _selectedMinute,
-        period: _selectedPeriod,
-        difficulty: _selectedDifficulty,
-        repetitions: _selectedRepetitions,
-        weight: _selectedWeight,
+          // Convertir hora de 12h a 24h
+      int hour24 = _selectedHour;
+      if (_selectedPeriod == 'PM' && _selectedHour != 12) {
+        hour24 += 12;
+      } else if (_selectedPeriod == 'AM' && _selectedHour == 12) {
+        hour24 = 0;
+      }
+
+      // Extraer repeticiones (ej. "8 - 12" → tomar máximo)
+      int repeticiones;
+      try {
+        repeticiones = int.parse(RegExp(r'\d+').firstMatch(_selectedRepetitions)!.group(0)!);
+      } catch (e) {
+        repeticiones = 0; // fallback si no encuentra número
+      }
+
+      // Extraer peso (de "12 kg" → 12.0)
+      double peso = double.parse(_selectedWeight.split(' ')[0]);
+
+      // Llamada al servicio
+      await _scheduleService.saveFuerzaExercise(
+        nombre: 'Sentadillas',
+        grupoMuscular: 'Piernas',
+        dificultad: _selectedDifficulty,
+        repeticiones: repeticiones,
+        peso: peso,
+        fecha: widget.selectedDate,
+        hora: hour24,
       );
 
       if (!mounted) {
