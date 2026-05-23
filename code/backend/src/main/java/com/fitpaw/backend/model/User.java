@@ -1,6 +1,5 @@
 package com.fitpaw.backend.model;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class User {
@@ -11,7 +10,7 @@ public class User {
     private String password;
     private String rol;
     private String genero;
-    private LocalDate fechaNacimiento;
+    private Integer fechaNacimiento; // Año de nacimiento
     private Double pesoActual;
     private Integer estaturaCm;
     private String objetivoPrincipal;
@@ -68,11 +67,11 @@ public class User {
         this.genero = genero;
     }
 
-    public LocalDate getFechaNacimiento() {
+    public Integer getFechaNacimiento() {
         return fechaNacimiento;
     }
 
-    public void setFechaNacimiento(LocalDate fechaNacimiento) {
+    public void setFechaNacimiento(Integer fechaNacimiento) {
         this.fechaNacimiento = fechaNacimiento;
     }
 

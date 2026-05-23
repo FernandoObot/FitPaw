@@ -241,15 +241,29 @@ class _PressHombrosScreenState extends State<PressHombrosScreen> {
   Future<void> _guardarPlan() async {
     setState(() => _isSaving = true);
     try {
-      await _scheduleService.saveExercisePlan(
-        exerciseName: 'Press de hombros',
-        weekday: widget.selectedDate.weekday,
-        hour: _selectedHour,
-        minute: _selectedMinute,
-        period: _selectedPeriod,
-        difficulty: _selectedDifficulty,
-        repetitions: _selectedRepetitions,
-        weight: _selectedWeight,
+      // Convertir hora de 12h a 24h
+      int hour24 = _selectedHour;
+      if (_selectedPeriod == 'PM' && _selectedHour != 12) {
+        hour24 += 12;
+      } else if (_selectedPeriod == 'AM' && _selectedHour == 12) {
+        hour24 = 0;
+      }
+
+      // Extraer repeticiones (tomar el máximo de "8 - 12" → 12)
+      List<String> repParts = _selectedRepetitions.split(' - ');
+      int repeticiones = int.parse(repParts.last.trim());
+
+      // Extraer peso (de "12 kg" → 12.0)
+      double peso = double.parse(_selectedWeight.split(' ')[0]);
+
+      await _scheduleService.saveFuerzaExercise(
+        nombre: 'Press de hombros',
+        grupoMuscular: 'Hombros',
+        dificultad: _selectedDifficulty,
+        repeticiones: repeticiones,
+        peso: peso,
+        fecha: widget.selectedDate,
+        hora: hour24,
       );
 
       if (!mounted) {

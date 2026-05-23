@@ -400,33 +400,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
+    debugPrint('👤 Iniciando _loadProfile()');
     try {
       final result = await _authService.getProfile();
+      debugPrint('👤 Resultado getProfile: $result');
       if (result['success']) {
         final data = result['data'] as Map<String, dynamic>;
-        setState(() {
-          _profileName = data['nickname'] ?? _profileName;
-          _profileGoal = data['objetivoPrincipal'] ?? _profileGoal;
-          if (data['estaturaCm'] != null) _profileHeight = '${data['estaturaCm']} cm';
-          if (data['pesoActual'] != null) _profileWeight = '${data['pesoActual'].toString()} kg';
-          if (data['fechaNacimiento'] != null) {
-            try {
-              final fecha = DateTime.parse(data['fechaNacimiento']);
-              final now = DateTime.now();
-              final edad = now.year - fecha.year - ((now.month < fecha.month || (now.month == fecha.month && now.day < fecha.day)) ? 1 : 0);
-              _profileAge = edad.toString();
-            } catch (_) {}
-          }
-          // update controllers
-          _nameController.text = _profileName;
-          _goalController.text = _profileGoal;
-          _heightController.text = _profileHeight.replaceAll(' cm', '');
-          _weightController.text = _profileWeight.replaceAll(' kg', '');
-          _ageController.text = _profileAge;
-        });
+        debugPrint('👤 Datos del perfil obtenidos: $data');
+        if (mounted) {
+          setState(() {
+            // Actualizar nombre si existe
+            if (data['nickname'] != null && (data['nickname'] as String).isNotEmpty) {
+              _profileName = data['nickname'] as String;
+              debugPrint('✅ Nombre actualizado: $_profileName');
+            }
+            
+            // Objetivo ya no viene del backend, mantener el valor por defecto
+            // _profileGoal = data['objetivoPrincipal'] ?? _profileGoal;
+            
+            // Actualizar estatura si existe
+            if (data['estaturaCm'] != null) {
+              _profileHeight = '${data['estaturaCm']} cm';
+              debugPrint('✅ Estatura actualizada: $_profileHeight');
+            }
+            
+            // Actualizar peso si existe
+            if (data['pesoActual'] != null) {
+              _profileWeight = '${data['pesoActual'].toString()} kg';
+              debugPrint('✅ Peso actualizado: $_profileWeight');
+            }
+            
+            // Calcular edad si existe fecha de nacimiento (ahora es un año como integer)
+            if (data['fechaNacimiento'] != null) {
+              try {
+                final ano = data['fechaNacimiento'] as int;
+                final now = DateTime.now();
+                final edad = now.year - ano;
+                _profileAge = edad.toString();
+                debugPrint('✅ Edad calculada: $_profileAge (año nacimiento: $ano)');
+              } catch (e) {
+                debugPrint('⚠️ Error al calcular edad: $e');
+              }
+            }
+            
+            // Actualizar controllers
+            _nameController.text = _profileName;
+            _goalController.text = _profileGoal;
+            _heightController.text = _profileHeight.replaceAll(' cm', '');
+            _weightController.text = _profileWeight.replaceAll(' kg', '');
+            _ageController.text = _profileAge;
+            debugPrint('✅ Perfil completamente actualizado');
+          });
+        }
+      } else {
+        debugPrint('❌ Error al cargar perfil: ${result['error']}');
       }
     } catch (e) {
-      // ignore loading errors silently for now
+      debugPrint('❌ Excepción al cargar perfil: $e');
     }
   }
 

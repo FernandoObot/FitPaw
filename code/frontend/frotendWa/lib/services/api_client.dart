@@ -13,26 +13,67 @@ class ApiClient {
         : 'http://192.168.1.68:8080';
   }
   
+  static final ApiClient _instance = ApiClient._internal();
+  static String? _staticToken; // Token compartido globalmente
+  
+  factory ApiClient() {
+    return _instance;
+  }
+  
+  ApiClient._internal();
+  
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   String? _token;
 
-  ApiClient();
-
   Future<void> loadToken() async {
-    _token = await _secureStorage.read(key: _tokenKey);
+    // Primero intentar cargar del token estático
+    if (_staticToken != null) {
+      _token = _staticToken;
+      debugPrint('✅ Token cargado del cache estático: ${_token!.substring(0, 20)}...');
+      return;
+    }
+    
+    // Intentar cargar de FlutterSecureStorage
+    try {
+      _token = await _secureStorage.read(key: _tokenKey);
+      if (_token != null) {
+        _staticToken = _token; // Guardar en cache estático
+        debugPrint('✅ Token cargado de FlutterSecureStorage: ${_token!.substring(0, 20)}...');
+      } else {
+        debugPrint('⚠️ No hay token en almacenamiento');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error al cargar token: $e');
+    }
   }
 
   Future<void> saveToken(String token) async {
     _token = token;
-    await _secureStorage.write(key: _tokenKey, value: token);
+    _staticToken = token; // Guardar en cache estático
+    try {
+      await _secureStorage.write(key: _tokenKey, value: token);
+      debugPrint('✅ Token guardado: ${token.substring(0, 20)}...');
+    } catch (e) {
+      debugPrint('⚠️ No se pudo guardar token: $e');
+    }
   }
 
   Future<void> clearToken() async {
     _token = null;
-    await _secureStorage.delete(key: _tokenKey);
+    _staticToken = null;
+    try {
+      await _secureStorage.delete(key: _tokenKey);
+      debugPrint('🔐 Token limpiado');
+    } catch (e) {
+      debugPrint('⚠️ Error al limpiar token: $e');
+    }
   }
 
-  String? getToken() => _token;
+  String? getToken() {
+    if (_token != null) return _token;
+    if (_staticToken != null) return _staticToken;
+    return null;
+  }
 
   Map<String, String> _getHeaders({bool needsAuth = true}) {
     final headers = {
@@ -40,8 +81,10 @@ class ApiClient {
       'Accept': 'application/json',
     };
     
-    if (needsAuth && _token != null) {
-      headers['Authorization'] = 'Bearer $_token';
+    final token = getToken();
+    if (needsAuth && token != null) {
+      headers['Authorization'] = 'Bearer $token';
+      debugPrint('📤 Authorization header: Bearer ${token.substring(0, 20)}...');
     }
     
     return headers;

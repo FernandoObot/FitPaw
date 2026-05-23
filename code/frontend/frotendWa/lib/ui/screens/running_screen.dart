@@ -20,11 +20,11 @@ class _RunningScreenState extends State<RunningScreen> {
   final WorkoutScheduleService _scheduleService = WorkoutScheduleService(ApiClient());
   int _selectedHour = 9;
   int _selectedMinute = 2;
-  String _selectedPeriod = 'PM';
+  String _selectedPeriod = 'AM';
   bool _isSaving = false;
 
   String _selectedDifficulty = 'Media';
-  String _selectedDistance = '3.2 km';
+  String _selectedTime = '45 min'; // Cambió de distancia a tiempo
   
 
   @override
@@ -169,15 +169,15 @@ class _RunningScreenState extends State<RunningScreen> {
                         ),
                         SizedBox(height: 12 * scale),
                         _DetailCard(
-                          icon: Icons.route_rounded,
-                          title: 'Ajustar distancia',
-                          subtitle: _selectedDistance,
+                          icon: Icons.timer_outlined,
+                          title: 'Tiempo del ejercicio',
+                          subtitle: _selectedTime,
                           compact: isCompact,
                           onTap: () => _showOptionSheet(
-                            title: 'Ajustar distancia',
-                            current: _selectedDistance,
-                            options: const ['2 km', '3.2 km', '5 km', '7 km', '10 km'],
-                            onSelect: (value) => setState(() => _selectedDistance = value),
+                            title: 'Seleccionar tiempo',
+                            current: _selectedTime,
+                            options: const ['25 min', '45 min', '60 min', '80 min'],
+                            onSelect: (value) => setState(() => _selectedTime = value),
                           ),
                         ),
                         
@@ -229,15 +229,23 @@ class _RunningScreenState extends State<RunningScreen> {
   Future<void> _guardarPlan() async {
     setState(() => _isSaving = true);
     try {
-      await _scheduleService.saveExercisePlan(
-        exerciseName: 'Correr',
-        weekday: widget.selectedDate.weekday,
-        hour: _selectedHour,
-        minute: _selectedMinute,
-        period: _selectedPeriod,
-        difficulty: _selectedDifficulty,
-        repetitions: _selectedDistance,
-        weight: 'Sin peso',
+      // Convertir hora 12h a formato 24h
+      int hour24 = _selectedHour;
+      if (_selectedPeriod == 'PM' && _selectedHour != 12) {
+        hour24 += 12;
+      } else if (_selectedPeriod == 'AM' && _selectedHour == 12) {
+        hour24 = 0;
+      }
+      
+      // Extraer minutos del texto (ej: "45 min" -> 45)
+      int timeMinutes = int.parse(_selectedTime.split(' ')[0]);
+
+      await _scheduleService.saveCardioExercise(
+        nombre: 'Correr',
+        dificultad: _selectedDifficulty,
+        tiempoMinutos: timeMinutes,
+        fecha: widget.selectedDate,
+        hora: hour24,
       );
 
       if (!mounted) {

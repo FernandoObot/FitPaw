@@ -185,10 +185,10 @@ public class AuthService {
             String updateSql = "UPDATE public.usuarios_cuenta SET genero = ?, fecha_nacimiento = ?, peso_actual = ?, estatura_cm = ? WHERE usuario_id = ?";
             try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
                 ps.setString(1, request.getGenero());
-                if (request.getFechaNacimiento() != null) {
-                    ps.setDate(2, java.sql.Date.valueOf(request.getFechaNacimiento()));
+                if (request.getFechaNacimiento() != null && request.getFechaNacimiento() > 0) {
+                    ps.setInt(2, request.getFechaNacimiento());
                 } else {
-                    ps.setNull(2, java.sql.Types.DATE);
+                    ps.setNull(2, java.sql.Types.INTEGER);
                 }
                 ps.setDouble(3, request.getPesoActual() != null ? request.getPesoActual() : 0);
                 ps.setInt(4, request.getEstaturaCm() != null ? request.getEstaturaCm() : 0);
@@ -270,7 +270,7 @@ public class AuthService {
 
     public User getProfile(int usuarioId) {
         try (Connection conn = conexionDB.conectar()) {
-            String sql = "SELECT usuario_id, nickname, objetivo_principal, genero, fecha_nacimiento, peso_actual, estatura_cm FROM public.usuarios_cuenta WHERE usuario_id = ?";
+            String sql = "SELECT usuario_id, nickname, genero, fecha_nacimiento, peso_actual, estatura_cm FROM public.usuarios_cuenta WHERE usuario_id = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, usuarioId);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -278,11 +278,10 @@ public class AuthService {
                         User user = new User();
                         user.setUsuarioId(rs.getInt("usuario_id"));
                         user.setNickname(rs.getString("nickname"));
-                        user.setObjetivoPrincipal(rs.getString("objetivo_principal"));
                         user.setGenero(rs.getString("genero"));
-                        java.sql.Date fecha = rs.getDate("fecha_nacimiento");
-                        if (fecha != null) {
-                            user.setFechaNacimiento(fecha.toLocalDate());
+                        Integer fechaNacimiento = rs.getInt("fecha_nacimiento");
+                        if (!rs.wasNull()) {
+                            user.setFechaNacimiento(fechaNacimiento);
                         }
                         Double peso = rs.getDouble("peso_actual");
                         if (!rs.wasNull()) user.setPesoActual(peso);

@@ -197,6 +197,114 @@ class WorkoutScheduleService {
     }
   }
 
+  /// Guardar ejercicio cardio con nombre, dificultad, tiempo en minutos, fecha, hora y completado=false
+  Future<void> saveCardioExercise({
+    required String nombre,
+    required String dificultad,
+    required int tiempoMinutos,
+    required DateTime fecha,
+    required int hora, // 6-23 (6 AM a 11 PM)
+  }) async {
+    debugPrint('📝 Guardando ejercicio cardio: $nombre');
+    
+    // Convertir dificultad a número: Baja=1, Media=2, Alta=3
+    int difficultyValue = _difficultyToInt(dificultad);
+    
+    final body = {
+      'nombre': nombre,
+      'dificultad': difficultyValue,
+      'tiempo_minutos': tiempoMinutos,
+      'fecha': fecha.toString().split(' ')[0], // Formato YYYY-MM-DD
+      'hora': hora,
+      'completado': false,
+    };
+    
+    debugPrint('📤 Enviando: $body');
+    
+    try {
+      final response = await apiClient.post(
+        '/ejercicios/cardio',
+        body: body,
+        needsAuth: true,
+      );
+
+      debugPrint('📡 Respuesta: status=${response.statusCode}');
+      
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        final errorMsg = _extractErrorMessage(response.body, response.statusCode);
+        debugPrint('❌ Error al guardar ejercicio cardio: $errorMsg');
+        throw Exception('No se pudo guardar ejercicio: $errorMsg');
+      }
+      
+      debugPrint('✅ Ejercicio cardio guardado exitosamente');
+    } catch (e) {
+      debugPrint('💥 Excepción al guardar ejercicio: $e');
+      rethrow;
+    }
+  }
+
+  /// Guardar ejercicio de fuerza
+  Future<void> saveFuerzaExercise({
+    required String nombre,
+    required String grupoMuscular,
+    required String dificultad,
+    required int repeticiones,
+    required double peso,
+    required DateTime fecha,
+    required int hora,
+  }) async {
+    debugPrint('📝 Guardando ejercicio de fuerza: $nombre');
+    
+    int difficultyValue = _difficultyToInt(dificultad);
+    
+    final body = {
+      'nombre': nombre,
+      'grupo_muscular': grupoMuscular,
+      'dificultad': difficultyValue,
+      'repeticiones': repeticiones,
+      'peso': peso,
+      'fecha': fecha.toString().split(' ')[0],
+      'hora': hora,
+      'completado': false,
+    };
+    
+    debugPrint('📤 Enviando: $body');
+    
+    try {
+      final response = await apiClient.post(
+        '/ejercicios/fuerza',
+        body: body,
+        needsAuth: true,
+      );
+
+      debugPrint('📡 Respuesta: status=${response.statusCode}');
+      
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        final errorMsg = _extractErrorMessage(response.body, response.statusCode);
+        debugPrint('❌ Error al guardar ejercicio de fuerza: $errorMsg');
+        throw Exception('No se pudo guardar ejercicio: $errorMsg');
+      }
+      
+      debugPrint('✅ Ejercicio de fuerza guardado exitosamente');
+    } catch (e) {
+      debugPrint('💥 Excepción al guardar ejercicio: $e');
+      rethrow;
+    }
+  }
+
+  int _difficultyToInt(String difficulty) {
+    switch (difficulty.toLowerCase()) {
+      case 'baja':
+        return 1;
+      case 'media':
+        return 2;
+      case 'alta':
+        return 3;
+      default:
+        return 2; // Media por defecto
+    }
+  }
+
   Future<ExercisePlan?> loadExercisePlan({required String exerciseName, required int weekday}) async {
     try {
       final String encodedName = Uri.encodeComponent(exerciseName);

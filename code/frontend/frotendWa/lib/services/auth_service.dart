@@ -100,7 +100,7 @@ class AuthService {
         '/auth/profile',
         body: {
           'genero': genero,
-          'fechaNacimiento': fechaNacimiento.toIso8601String().split('T').first,
+          'fechaNacimiento': fechaNacimiento.year, // Enviar solo el año como integer
           'pesoActual': pesoActual,
           'estaturaCm': estaturaCm,
         },

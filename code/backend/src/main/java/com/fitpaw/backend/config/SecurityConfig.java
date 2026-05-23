@@ -35,6 +35,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/auth/register", "/auth/login").permitAll()
                     .requestMatchers("/auth/**").authenticated()
+                    .requestMatchers("/ejercicios/**").authenticated()
                     .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -45,8 +46,12 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
+                "http://localhost:8080",
+                "http://127.0.0.1:8080",
                 "http://localhost:8085",
                 "http://127.0.0.1:8085",
+                "http://localhost:8086",
+                "http://127.0.0.1:8086",
                 "http://localhost:3000",
                 "http://127.0.0.1:3000"
         ));

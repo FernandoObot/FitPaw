@@ -51,21 +51,44 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
   }
 
   Future<void> _loadProfileName() async {
-    final result = await _authService.getProfile();
-    if (!mounted) {
-      return;
-    }
+    debugPrint('📱 Iniciando _loadProfileName()');
+    try {
+      final result = await _authService.getProfile();
+      debugPrint('📱 Resultado getProfile: $result');
+      
+      if (!mounted) {
+        debugPrint('📱 Widget no está mounted, cancelando actualización');
+        return;
+      }
 
-    if (result['success'] == true) {
-      final data = result['data'] as Map<String, dynamic>;
-      setState(() {
-        _profileName = (data['nickname'] as String?)?.trim().isNotEmpty == true
-            ? data['nickname'] as String
-            : _profileName;
-        _loadingProfileName = false;
-      });
-    } else {
-      setState(() => _loadingProfileName = false);
+      if (result['success'] == true) {
+        final data = result['data'] as Map<String, dynamic>;
+        debugPrint('📱 Datos del perfil obtenidos: $data');
+        final nickname = data['nickname'] as String?;
+        
+        setState(() {
+          if (nickname != null && nickname.trim().isNotEmpty) {
+            _profileName = nickname;
+            debugPrint('✅ Nombre cargado desde API: $_profileName');
+          } else {
+            debugPrint('⚠️ Nickname vacío o null, usando: $_profileName');
+          }
+          _loadingProfileName = false;
+        });
+      } else {
+        final error = result['error'];
+        debugPrint('❌ Error al cargar perfil: $error');
+        setState(() {
+          _loadingProfileName = false;
+          // Mantener el nombre por defecto si hay error
+          debugPrint('⚠️ Usando nombre por defecto: $_profileName');
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Excepción en _loadProfileName: $e');
+      if (mounted) {
+        setState(() => _loadingProfileName = false);
+      }
     }
   }
 

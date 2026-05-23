@@ -1,11 +1,11 @@
 package com.fitpaw.backend.DTOs;
 
-import java.time.LocalDate;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 
 public class UpdateProfileRequest {
 
     private String genero;
-    private LocalDate fechaNacimiento;
+    private Integer fechaNacimiento; // Año de nacimiento (1950-2006) o fecha ISO string
     private Double pesoActual;
     private Integer estaturaCm;
 
@@ -20,12 +20,37 @@ public class UpdateProfileRequest {
         this.genero = genero;
     }
 
-    public LocalDate getFechaNacimiento() {
+    public Integer getFechaNacimiento() {
         return fechaNacimiento;
     }
 
-    public void setFechaNacimiento(LocalDate fechaNacimiento) {
-        this.fechaNacimiento = fechaNacimiento;
+    /**
+     * Acepta tanto Integer (año) como String (fecha ISO o año string)
+     */
+    public void setFechaNacimiento(Object fechaNacimiento) {
+        if (fechaNacimiento == null) {
+            this.fechaNacimiento = null;
+        } else if (fechaNacimiento instanceof Integer) {
+            this.fechaNacimiento = (Integer) fechaNacimiento;
+        } else if (fechaNacimiento instanceof String) {
+            String str = (String) fechaNacimiento;
+            try {
+                // Si es un string de año simple (e.g., "2005")
+                if (str.matches("\\d{4}")) {
+                    this.fechaNacimiento = Integer.parseInt(str);
+                } else if (str.contains("-")) {
+                    // Si es una fecha ISO (e.g., "2005-01-01"), extraer el año
+                    this.fechaNacimiento = Integer.parseInt(str.substring(0, 4));
+                } else {
+                    // Intentar parsear como integer
+                    this.fechaNacimiento = Integer.parseInt(str);
+                }
+            } catch (Exception e) {
+                throw new IllegalArgumentException("No se pudo parsear fecha de nacimiento: " + str, e);
+            }
+        } else {
+            throw new IllegalArgumentException("fechaNacimiento debe ser Integer o String");
+        }
     }
 
     public Double getPesoActual() {
