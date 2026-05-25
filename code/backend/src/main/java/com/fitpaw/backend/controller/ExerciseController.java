@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/ejercicios")
@@ -82,6 +84,110 @@ public class ExerciseController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("mensaje", "Error al guardar ejercicio: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Listar ejercicios por fecha (cardio + fuerza)
+     * GET /ejercicios?fecha=YYYY-MM-DD
+     */
+    @GetMapping
+    public ResponseEntity<?> listExercisesByDate(@RequestParam String fecha, Authentication auth) {
+        if (auth == null || auth.getDetails() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("mensaje", "No autenticado"));
+        }
+
+        try {
+            int usuarioId = (int) auth.getDetails();
+            LocalDate date = LocalDate.parse(fecha);
+            List<Map<String, Object>> ejercicios = exerciseService.getExercisesByDate(usuarioId, date);
+            return ResponseEntity.ok(ejercicios);
+        } catch (java.time.format.DateTimeParseException e) {
+            return ResponseEntity.badRequest().body(Map.of("mensaje", "Formato de fecha inválido"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("mensaje", "Error al listar ejercicios: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Marcar ejercicio como completado
+     * PATCH /ejercicios/completar
+     */
+    @PatchMapping("/completar")
+    public ResponseEntity<?> markExerciseCompleted(
+            @RequestBody Map<String, Object> request,
+            Authentication auth) {
+        
+        if (auth == null || auth.getDetails() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("mensaje", "No autenticado"));
+        }
+
+        try {
+            int usuarioId = (int) auth.getDetails();
+            String nombre = (String) request.get("nombre");
+            String fecha = (String) request.get("fecha");
+            
+            if (nombre == null || fecha == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("mensaje", "nombre y fecha son requeridos"));
+            }
+
+            LocalDate date = LocalDate.parse(fecha);
+            exerciseService.markExerciseCompleted(usuarioId, nombre, date);
+            
+            return ResponseEntity.ok(Map.of(
+                    "mensaje", "Ejercicio marcado como completado",
+                    "nombre", nombre,
+                    "fecha", fecha
+            ));
+        } catch (java.time.format.DateTimeParseException e) {
+            return ResponseEntity.badRequest().body(Map.of("mensaje", "Formato de fecha inválido"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("mensaje", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("mensaje", "Error: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Eliminar ejercicio
+     * DELETE /ejercicios/eliminar?nombre=...&fecha=YYYY-MM-DD
+     */
+    @DeleteMapping("/eliminar")
+    public ResponseEntity<?> deleteExercise(
+            @RequestParam String nombre,
+            @RequestParam String fecha,
+            Authentication auth) {
+        
+        if (auth == null || auth.getDetails() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("mensaje", "No autenticado"));
+        }
+
+        try {
+            int usuarioId = (int) auth.getDetails();
+            LocalDate date = LocalDate.parse(fecha);
+            
+            exerciseService.deleteExercise(usuarioId, nombre, date);
+            
+            return ResponseEntity.ok(Map.of(
+                    "mensaje", "Ejercicio eliminado",
+                    "nombre", nombre,
+                    "fecha", fecha
+            ));
+        } catch (java.time.format.DateTimeParseException e) {
+            return ResponseEntity.badRequest().body(Map.of("mensaje", "Formato de fecha inválido"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("mensaje", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("mensaje", "Error: " + e.getMessage()));
         }
     }
 }

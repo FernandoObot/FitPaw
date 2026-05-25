@@ -18,14 +18,25 @@ class FlexionUnaPiernaScreen extends StatefulWidget {
 
 class _FlexionUnaPiernaScreenState extends State<FlexionUnaPiernaScreen> {
   final WorkoutScheduleService _scheduleService = WorkoutScheduleService(ApiClient());
-  int _selectedHour = 9;
-  int _selectedMinute = 2;
-  String _selectedPeriod = 'PM';
+  late int _selectedHour;
+  late int _selectedMinute;
+  late String _selectedPeriod;
   bool _isSaving = false;
 
   String _selectedDifficulty = 'Media';
   String _selectedRepetitions = '12 reps por pierna';
   String _selectedWeight = '12 kg';
+
+  static const List<String> _weekdayLabels = ['Lun', 'Mar', 'Mier', 'Juev', 'Vier', 'Sab', 'Dom'];
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _selectedHour = now.hour % 12 == 0 ? 12 : now.hour % 12;
+    _selectedMinute = now.minute;
+    _selectedPeriod = now.hour >= 12 ? 'PM' : 'AM';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +103,7 @@ class _FlexionUnaPiernaScreenState extends State<FlexionUnaPiernaScreen> {
                           children: [
                             Icon(Icons.calendar_today_outlined, color: AppColors.textSecondary, size: 18 * scale),
                             SizedBox(width: 8 * scale),
-                            Text('Mier', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                            Text(_weekdayLabels[(widget.selectedDate.weekday - 1).clamp(0, 6)], style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                           ],
                         ),
                         SizedBox(height: 12 * scale),
@@ -249,6 +260,26 @@ class _FlexionUnaPiernaScreenState extends State<FlexionUnaPiernaScreen> {
         hour24 = 0;
       }
 
+      // VALIDACIÓN: Verificar conflictos antes de guardar
+      final String? conflictError = await _scheduleService.checkExerciseConflicts(
+        nombreEjercicio: 'Flexion de una pierna',
+        fecha: widget.selectedDate,
+        hora: hour24,
+      );
+
+      if (conflictError != null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(conflictError),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        setState(() => _isSaving = false);
+        return; // No guardar si hay conflicto
+      }
+
       // Extraer repeticiones (tomar el máximo de "8 - 12" → 12)
       int repeticiones;
       try {
@@ -274,6 +305,18 @@ class _FlexionUnaPiernaScreenState extends State<FlexionUnaPiernaScreen> {
         return;
       }
 
+      final Map<String, dynamic> newlySavedExercise = {
+        'nombre': 'Flexion de una pierna',
+        'tipo': 'fuerza',
+        'grupo_muscular': 'Piernas',
+        'dificultad': _difficultyToInt(_selectedDifficulty),
+        'repeticiones': repeticiones,
+        'peso': peso,
+        'fecha': widget.selectedDate.toString().split(' ')[0],
+        'hora': hour24,
+        'completado': false,
+      };
+
       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => TrainingScheduleScreen(
@@ -281,6 +324,7 @@ class _FlexionUnaPiernaScreenState extends State<FlexionUnaPiernaScreen> {
             exerciseSubtitle: '3 series de 10 reps',
             exerciseIcon: Icons.accessibility_new_rounded,
             initialSelectedDate: widget.selectedDate,
+            newlySavedExercise: newlySavedExercise,
           ),
         ),
         (_) => false,
@@ -457,6 +501,19 @@ class _FlexionUnaPiernaScreenState extends State<FlexionUnaPiernaScreen> {
         );
       },
     );
+  }
+
+  int _difficultyToInt(String difficulty) {
+    switch (difficulty.toLowerCase()) {
+      case 'baja':
+        return 1;
+      case 'media':
+        return 2;
+      case 'alta':
+        return 3;
+      default:
+        return 2;
+    }
   }
 }
 

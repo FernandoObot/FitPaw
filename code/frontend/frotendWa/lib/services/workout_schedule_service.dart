@@ -9,194 +9,6 @@ class WorkoutScheduleService {
 
   WorkoutScheduleService(this.apiClient);
 
-  Future<void> saveSentadillasPlan({
-    required int weekday,
-    required int hour,
-    required int minute,
-    required String period,
-    required String difficulty,
-    required String repetitions,
-    required String weight,
-  }) async {
-    debugPrint('Guardando sentadillas para día $weekday: $hour:${minute.toString().padLeft(2, '0')} $period');
-    
-    final body = {
-      'diaSemana': weekday,
-      'hora': hour,
-      'minuto': minute,
-      'periodo': period,
-      'dificultad': difficulty,
-      'repeticiones': repetitions,
-      'peso': weight,
-    };
-    
-    try {
-      final response = await apiClient.post(
-        '/training/rutinas/sentadillas',
-        body: body,
-        needsAuth: true,
-      );
-
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        final errorMsg = _extractErrorMessage(response.body, response.statusCode);
-        debugPrint('Error al guardar sentadillas: $errorMsg (status: ${response.statusCode})');
-        throw Exception('No se pudo guardar sentadillas: $errorMsg');
-      }
-      
-      debugPrint('Sentadillas guardadas exitosamente');
-    } catch (e) {
-      debugPrint('Excepción al guardar sentadillas: $e');
-      rethrow;
-    }
-  }
-
-  Future<SentadillasPlan?> loadSentadillasPlan({required int weekday}) async {
-    try {
-      final response = await apiClient.get(
-        '/training/rutinas/sentadillas?diaSemana=$weekday',
-        needsAuth: true,
-      );
-
-      if (response.statusCode == 404) {
-        debugPrint('No hay plan de sentadillas para el día $weekday');
-        return null;
-      }
-
-      if (response.statusCode != 200) {
-        final errorMsg = _extractErrorMessage(response.body, response.statusCode);
-        debugPrint('Error al cargar sentadillas: $errorMsg (status: ${response.statusCode})');
-        throw Exception('No se pudo cargar sentadillas: $errorMsg');
-      }
-
-      final Map<String, dynamic> data = jsonDecode(response.body) as Map<String, dynamic>;
-      final plan = SentadillasPlan(
-        weekday: (data['diaSemana'] as num?)?.toInt() ?? weekday,
-        hour: (data['hora'] as num?)?.toInt() ?? 9,
-        minute: (data['minuto'] as num?)?.toInt() ?? 0,
-        period: (data['periodo'] as String?) ?? 'AM',
-        difficulty: (data['dificultad'] as String?) ?? 'Media',
-        repetitions: (data['repeticiones'] as String?) ?? '8 - 12',
-        weight: (data['peso'] as String?) ?? '12 kg',
-        completed: (data['completado'] as bool?) ?? false,
-      );
-      debugPrint('Plan de sentadillas cargado: ${plan.summaryLabel} a ${plan.timeLabel}');
-      return plan;
-    } catch (e) {
-      debugPrint('Excepción al cargar sentadillas: $e');
-      rethrow;
-    }
-  }
-
-  Future<Set<String>> loadCompletedExercises({required int weekday}) async {
-    final response = await apiClient.get(
-      '/training/rutinas/completadas?diaSemana=$weekday',
-      needsAuth: true,
-    );
-
-    if (response.statusCode == 404) {
-      return <String>{};
-    }
-
-    if (response.statusCode != 200) {
-      throw Exception('No se pudieron cargar las rutinas completadas: ${_extractErrorMessage(response.body, response.statusCode)}');
-    }
-
-    final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
-    return data
-        .map((item) => (item as Map<String, dynamic>)['ejercicioEtiqueta'] as String?)
-        .whereType<String>()
-        .toSet();
-  }
-
-  Future<void> markRoutineCompleted({required int weekday, required String exerciseLabel, String? detail}) async {
-    final response = await apiClient.post(
-      '/training/rutinas/completadas',
-      body: {
-        'diaSemana': weekday,
-        'ejercicioEtiqueta': exerciseLabel,
-        'detalle': detail,
-      },
-      needsAuth: true,
-    );
-
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('No se pudo marcar la rutina como completada: ${_extractErrorMessage(response.body, response.statusCode)}');
-    }
-  }
-
-  Future<SentadillasPlan?> markSentadillasCompleted({required int weekday}) async {
-    final response = await apiClient.post(
-      '/training/rutinas/sentadillas/completar?diaSemana=$weekday',
-      body: const {},
-      needsAuth: true,
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('No se pudo marcar sentadillas como completadas: ${_extractErrorMessage(response.body, response.statusCode)}');
-    }
-
-    final Map<String, dynamic> data = jsonDecode(response.body) as Map<String, dynamic>;
-    return SentadillasPlan(
-      weekday: (data['diaSemana'] as num?)?.toInt() ?? weekday,
-      hour: (data['hora'] as num?)?.toInt() ?? 9,
-      minute: (data['minuto'] as num?)?.toInt() ?? 0,
-      period: (data['periodo'] as String?) ?? 'AM',
-      difficulty: (data['dificultad'] as String?) ?? 'Media',
-      repetitions: (data['repeticiones'] as String?) ?? '8 - 12',
-      weight: (data['peso'] as String?) ?? '12 kg',
-      completed: (data['completado'] as bool?) ?? true,
-    );
-  }
-
-  // Generic exercise methods for Press Hombros, Flexión, Correr
-  Future<void> saveExercisePlan({
-    required String exerciseName,
-    required int weekday,
-    required int hour,
-    required int minute,
-    required String period,
-    required String difficulty,
-    required String repetitions,
-    required String weight,
-  }) async {
-    debugPrint('📝 Guardando $exerciseName para día $weekday: $hour:${minute.toString().padLeft(2, '0')} $period');
-    
-    final body = {
-      'diaSemana': weekday,
-      'hora': hour,
-      'minuto': minute,
-      'periodo': period,
-      'dificultad': difficulty,
-      'repeticiones': repetitions,
-      'peso': weight,
-      'ejercicio': exerciseName,
-    };
-    
-    debugPrint('📤 Enviando: $body');
-    
-    try {
-      final response = await apiClient.post(
-        '/training/rutinas/ejercicio',
-        body: body,
-        needsAuth: true,
-      );
-
-      debugPrint('📡 Respuesta: status=${response.statusCode}');
-      debugPrint('Cuerpo: ${response.body}');
-      
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        final errorMsg = _extractErrorMessage(response.body, response.statusCode);
-        debugPrint('❌ Error al guardar $exerciseName: $errorMsg (status: ${response.statusCode})');
-        throw Exception('No se pudo guardar $exerciseName: $errorMsg');
-      }
-      
-      debugPrint('✅ $exerciseName guardado exitosamente');
-    } catch (e) {
-      debugPrint('💥 Excepción al guardar $exerciseName: $e');
-      rethrow;
-    }
-  }
-
   /// Guardar ejercicio cardio con nombre, dificultad, tiempo en minutos, fecha, hora y completado=false
   Future<void> saveCardioExercise({
     required String nombre,
@@ -305,49 +117,112 @@ class WorkoutScheduleService {
     }
   }
 
-  Future<ExercisePlan?> loadExercisePlan({required String exerciseName, required int weekday}) async {
+  
+  /// Cargar ejercicios guardados para una fecha (cardio + fuerza)
+  Future<List<Map<String, dynamic>>> loadExercisesForDate({required DateTime fecha}) async {
+    final String dateStr = fecha.toString().split(' ')[0];
+    final response = await apiClient.get('/ejercicios?fecha=$dateStr', needsAuth: true);
+
+    if (response.statusCode == 404) {
+      return [];
+    }
+
+    if (response.statusCode != 200) {
+      throw Exception('No se pudieron cargar ejercicios: ${_extractErrorMessage(response.body, response.statusCode)}');
+    }
+
+    final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  /// Validar conflictos de ejercicio antes de guardar
+  /// Retorna null si no hay conflictos
+  /// Retorna un mensaje de error si hay conflictos
+  Future<String?> checkExerciseConflicts({
+    required String nombreEjercicio,
+    required DateTime fecha,
+    required int hora,
+  }) async {
     try {
-      final String encodedName = Uri.encodeComponent(exerciseName);
-      final String url = '/training/rutinas/ejercicio?nombre=$encodedName&diaSemana=$weekday';
-      debugPrint('🔍 Cargando ejercicio: URL=$url (nombre=$exerciseName, día=$weekday)');
+      final ejerciciosDelDia = await loadExercisesForDate(fecha: fecha);
+      debugPrint('🔍 Validando conflictos para $nombreEjercicio a las $hora:00 - encontrados ${ejerciciosDelDia.length} ejercicios');
       
-      final response = await apiClient.get(
-        url,
+      for (final ejercicio in ejerciciosDelDia) {
+        final String nombreExistente = (ejercicio['nombre'] as String?) ?? '';
+        final int horaExistente = (ejercicio['hora'] is num) ? (ejercicio['hora'] as num).toInt() : 0;
+        
+        // Validación 1: ¿Hay ejercicio en este horario?
+        if (horaExistente == hora) {
+          debugPrint('⚠️ CONFLICTO DE HORARIO: Ya hay "$nombreExistente" a las $hora:00');
+          return '⏰ Ya tienes "$nombreExistente" a las $hora:00. No puedes poner dos ejercicios en el mismo horario.';
+        }
+        
+        // Validación 2: ¿Hay del mismo tipo en este día?
+        if (nombreExistente.toLowerCase() == nombreEjercicio.toLowerCase()) {
+          debugPrint('⚠️ CONFLICTO DE TIPO: Ya existe "$nombreExistente" en este día');
+          return '🔄 Ya tienes "$nombreEjercicio" registrado en este día. Solo puedes hacer uno de cada tipo por día.';
+        }
+      }
+      
+      debugPrint('✅ Sin conflictos para $nombreEjercicio');
+      return null; // Sin conflictos
+    } catch (e) {
+      debugPrint('⚠️ Error al validar conflictos: $e');
+      return null; // Si hay error en la validación, permitir guardar igual
+    }
+  }
+
+  /// Marcar ejercicio como completado (actualizar campo completado a true)
+  Future<void> markExerciseCompleted({
+    required String nombre,
+    required DateTime fecha,
+  }) async {
+    final String dateStr = fecha.toString().split(' ')[0];
+    try {
+      final response = await apiClient.patch(
+        '/ejercicios/completar',
+        body: {
+          'nombre': nombre,
+          'fecha': dateStr,
+          'completado': true,
+        },
         needsAuth: true,
       );
 
-      debugPrint('📡 Respuesta: status=${response.statusCode}');
-      
-      if (response.statusCode == 404) {
-        debugPrint('⚠️ No hay plan de $exerciseName para el día $weekday');
-        return null;
-      }
-
-      if (response.statusCode != 200) {
+      if (response.statusCode != 200 && response.statusCode != 201) {
         final errorMsg = _extractErrorMessage(response.body, response.statusCode);
-        debugPrint('❌ Error al cargar $exerciseName: $errorMsg (status: ${response.statusCode})');
-        debugPrint('Respuesta: ${response.body}');
-        throw Exception('No se pudo cargar $exerciseName: $errorMsg');
+        debugPrint('❌ Error al marcar como completado: $errorMsg');
+        throw Exception('No se pudo marcar como completado: $errorMsg');
       }
 
-      final Map<String, dynamic> data = jsonDecode(response.body) as Map<String, dynamic>;
-      debugPrint('✅ Datos recibidos: $data');
-      
-      final plan = ExercisePlan(
-        weekday: (data['diaSemana'] as num?)?.toInt() ?? weekday,
-        hour: (data['hora'] as num?)?.toInt() ?? 9,
-        minute: (data['minuto'] as num?)?.toInt() ?? 0,
-        period: (data['periodo'] as String?) ?? 'AM',
-        difficulty: (data['dificultad'] as String?) ?? 'Media',
-        repetitions: (data['repeticiones'] as String?) ?? '8 - 12',
-        weight: (data['peso'] as String?) ?? '12 kg',
-        exerciseName: exerciseName,
-        completed: (data['completado'] as bool?) ?? false,
-      );
-      debugPrint('✨ Plan de $exerciseName cargado: ${plan.summaryLabel}');
-      return plan;
+      debugPrint('✅ Ejercicio "$nombre" marcado como completado');
     } catch (e) {
-      debugPrint('💥 Excepción al cargar $exerciseName: $e');
+      debugPrint('💥 Excepción al marcar completado: $e');
+      rethrow;
+    }
+  }
+
+  /// Eliminar un ejercicio de la base de datos
+  Future<void> deleteExercise({
+    required String nombre,
+    required DateTime fecha,
+  }) async {
+    final String dateStr = fecha.toString().split(' ')[0];
+    try {
+      final response = await apiClient.delete(
+        '/ejercicios/eliminar?nombre=${Uri.encodeComponent(nombre)}&fecha=$dateStr',
+        needsAuth: true,
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        final errorMsg = _extractErrorMessage(response.body, response.statusCode);
+        debugPrint('❌ Error al eliminar ejercicio: $errorMsg');
+        throw Exception('No se pudo eliminar el ejercicio: $errorMsg');
+      }
+
+      debugPrint('✅ Ejercicio "$nombre" eliminado');
+    } catch (e) {
+      debugPrint('💥 Excepción al eliminar ejercicio: $e');
       rethrow;
     }
   }
@@ -371,49 +246,7 @@ class WorkoutScheduleService {
   }
 }
 
-class SentadillasPlan {
-  final int weekday;
-  final int hour;
-  final int minute;
-  final String period;
-  final String difficulty;
-  final String repetitions;
-  final String weight;
-  final bool completed;
-
-  const SentadillasPlan({
-    required this.weekday,
-    required this.hour,
-    required this.minute,
-    required this.period,
-    required this.difficulty,
-    required this.repetitions,
-    required this.weight,
-    required this.completed,
-  });
-
-  String get timeLabel {
-    final int normalizedHour = hour == 0 ? 12 : hour;
-    return '${normalizedHour.toString().padLeft(2, '0')}:00 $period';
-  }
-
-  String get summaryLabel => 'Sentadillas, $repetitions reps, $weight';
-
-  SentadillasPlan copyWithCompleted(bool value) {
-    return SentadillasPlan(
-      weekday: weekday,
-      hour: hour,
-      minute: minute,
-      period: period,
-      difficulty: difficulty,
-      repetitions: repetitions,
-      weight: weight,
-      completed: value,
-    );
-  }
-}
-
-// Generic exercise plan class for other exercises
+// Exercise plan class for all exercises
 class ExercisePlan {
   final int weekday;
   final int hour;
@@ -442,5 +275,15 @@ class ExercisePlan {
     return '${normalizedHour.toString().padLeft(2, '0')}:00 $period';
   }
 
-  String get summaryLabel => '$exerciseName, $repetitions reps, $weight';
+  String get summaryLabel {
+    // Para cardio (sin peso, solo tiempo)
+    if (weight.isEmpty || weight == '0 kg') {
+      return '$exerciseName, $repetitions';
+    }
+    // Para fuerza (con reps y peso)
+    if (repetitions.contains('min')) {
+      return '$exerciseName, $repetitions';
+    }
+    return '$exerciseName, $repetitions reps, $weight';
+  }
 }

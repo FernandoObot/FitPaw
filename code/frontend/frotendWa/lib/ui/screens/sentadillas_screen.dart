@@ -18,9 +18,9 @@ class SentadillasScreen extends StatefulWidget {
 
 class _SentadillasScreenState extends State<SentadillasScreen> {
   final WorkoutScheduleService _scheduleService = WorkoutScheduleService(ApiClient());
-  int _selectedHour = 9;
-  int _selectedMinute = 2;
-  String _selectedPeriod = 'PM';
+  late int _selectedHour;
+  late int _selectedMinute;
+  late String _selectedPeriod;
   bool _isSaving = false;
 
   String _selectedDifficulty = 'Media';
@@ -32,7 +32,10 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
   @override
   void initState() {
     super.initState();
-    _loadExistingPlan();
+    final now = DateTime.now();
+    _selectedHour = now.hour % 12 == 0 ? 12 : now.hour % 12;
+    _selectedMinute = now.minute;
+    _selectedPeriod = now.hour >= 12 ? 'PM' : 'AM';
   }
 
   @override
@@ -255,12 +258,32 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
   Future<void> _guardarPlan() async {
     setState(() => _isSaving = true);
     try {
-          // Convertir hora de 12h a 24h
+      // Convertir hora de 12h a 24h
       int hour24 = _selectedHour;
       if (_selectedPeriod == 'PM' && _selectedHour != 12) {
         hour24 += 12;
       } else if (_selectedPeriod == 'AM' && _selectedHour == 12) {
         hour24 = 0;
+      }
+
+      // VALIDACIÓN: Verificar conflictos antes de guardar
+      final String? conflictError = await _scheduleService.checkExerciseConflicts(
+        nombreEjercicio: 'Sentadillas',
+        fecha: widget.selectedDate,
+        hora: hour24,
+      );
+
+      if (conflictError != null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(conflictError),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        setState(() => _isSaving = false);
+        return; // No guardar si hay conflicto
       }
 
       // Extraer repeticiones (ej. "8 - 12" → tomar máximo)
@@ -289,6 +312,18 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
         return;
       }
 
+      final Map<String, dynamic> newlySavedExercise = {
+        'nombre': 'Sentadillas',
+        'tipo': 'fuerza',
+        'grupo_muscular': 'Piernas',
+        'dificultad': _difficultyToInt(_selectedDifficulty),
+        'repeticiones': repeticiones,
+        'peso': peso,
+        'fecha': widget.selectedDate.toString().split(' ')[0],
+        'hora': hour24,
+        'completado': false,
+      };
+
       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => TrainingScheduleScreen(
@@ -296,6 +331,7 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
             exerciseSubtitle: '3 series de 15 reps',
             exerciseIcon: Icons.directions_run_rounded,
             initialSelectedDate: widget.selectedDate,
+            newlySavedExercise: newlySavedExercise,
           ),
         ),
         (_) => false,
@@ -315,23 +351,16 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
     }
   }
 
-  Future<void> _loadExistingPlan() async {
-    try {
-      final plan = await _scheduleService.loadSentadillasPlan(weekday: widget.selectedDate.weekday);
-      if (!mounted || plan == null) {
-        return;
-      }
-
-      setState(() {
-        _selectedHour = plan.hour;
-        _selectedMinute = plan.minute;
-        _selectedPeriod = plan.period;
-        _selectedDifficulty = plan.difficulty;
-        _selectedRepetitions = plan.repetitions;
-        _selectedWeight = plan.weight;
-      });
-    } catch (_) {
-      // If the plan does not exist yet, keep the defaults.
+  int _difficultyToInt(String difficulty) {
+    switch (difficulty.toLowerCase()) {
+      case 'baja':
+        return 1;
+      case 'media':
+        return 2;
+      case 'alta':
+        return 3;
+      default:
+        return 2;
     }
   }
 

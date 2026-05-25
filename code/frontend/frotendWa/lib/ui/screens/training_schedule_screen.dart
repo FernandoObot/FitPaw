@@ -19,6 +19,7 @@ class TrainingScheduleScreen extends StatefulWidget {
   final String exerciseSubtitle;
   final IconData exerciseIcon;
   final DateTime? initialSelectedDate;
+  final Map<String, dynamic>? newlySavedExercise;
 
   const TrainingScheduleScreen({
     super.key,
@@ -26,6 +27,7 @@ class TrainingScheduleScreen extends StatefulWidget {
     required this.exerciseSubtitle,
     required this.exerciseIcon,
     this.initialSelectedDate,
+    this.newlySavedExercise,
   });
 
   @override
@@ -81,23 +83,14 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
   late DateTime _currentMonth;
   late DateTime _now;
   Map<String, ExercisePlan> _ejercicios = {}; // Mapa unificado de nombre -> plan
-  Set<String> _ejerciciosCompletados = {}; // Ejercicios marcados como completados
   bool _isLoadingSentadillas = true;
   String _selectedRoutineLabel = 'Cardio';
   String _selectedDifficultyLabel = 'Facil';
   String _selectedRepetitionsLabel = '8 - 12';
   String _selectedWeightLabel = '12 kg';
   final ScrollController _timelineController = ScrollController();
-  
-  // Lista de ejercicios genéricos para buscar
-  static const List<String> EJERCICIOS_GENERICOS = [
-    'Press de hombros',
-    'Flexión una pierna',
-    'Correr',
-  ];
   final ScrollController _monthController = ScrollController();
   Timer? _clockTimer;
-  bool _didScrollToNow = false;
   int _selectedBottomIndex = 1;
 
   @override
@@ -108,7 +101,17 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     _selectedDate = DateTime(initialDate.year, initialDate.month, initialDate.day);
     _currentMonth = DateTime(now.year, now.month, 1);
     _now = now;
+    
+    debugPrint('🔵 TrainingScheduleScreen initState - newlySavedExercise=${widget.newlySavedExercise}');
+    
+    // Procesar newlySavedExercise INMEDIATAMENTE (UI optimista antes de que cargue desde BD)
+    if (widget.newlySavedExercise != null) {
+      _processNewlySavedExercise();
+    }
+    
+    // Luego cargar desde la BD (la fuente de verdad)
     _loadExercisePlan();
+    
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (!mounted) {
         return;
@@ -133,82 +136,147 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     super.dispose();
   }
 
+  void _processNewlySavedExercise() {
+    if (widget.newlySavedExercise == null) return;
+    
+    try {
+      final Map<String, dynamic> row = widget.newlySavedExercise!;
+      final String nombre = (row['nombre'] as String?) ?? 'Ejercicio';
+      final int hora = (row['hora'] is num) ? (row['hora'] as num).toInt() : 9;
+      final bool completado = (row['completado'] as bool?) ?? false;
+
+      String dificultadLabel = 'Media';
+      final Object? dif = row['dificultad'];
+      if (dif is num) {
+        final int dv = (dif as num).toInt();
+        if (dv == 1) dificultadLabel = 'Baja';
+        else if (dv == 3) dificultadLabel = 'Alta';
+        else dificultadLabel = 'Media';
+      } else if (dif is String) {
+        dificultadLabel = dif;
+      }
+
+      String repetitionsLabel = '';
+      String weightLabel = '';
+
+      final String tipo = (row['tipo'] as String?) ?? 'cardio';
+      if (tipo == 'cardio') {
+        final Object? tiempo = row['tiempo_minutos'];
+        repetitionsLabel = (tiempo != null) ? '${tiempo.toString()} min' : '';
+      } else {
+        final Object? reps = row['repeticiones'];
+        final Object? peso = row['peso'];
+        repetitionsLabel = (reps != null) ? reps.toString() : '';
+        weightLabel = (peso != null) ? '${peso.toString()} kg' : '';
+      }
+
+      final int hour12 = (hora % 12 == 0) ? 12 : hora % 12;
+      final String period = hora >= 12 ? 'PM' : 'AM';
+
+      final ExercisePlan newExercise = ExercisePlan(
+        weekday: _selectedDate.weekday,
+        hour: hour12,
+        minute: 0,
+        period: period,
+        difficulty: dificultadLabel,
+        repetitions: repetitionsLabel.isNotEmpty ? repetitionsLabel : '0',
+        weight: weightLabel,
+        exerciseName: nombre,
+        completed: completado,
+      );
+
+      _ejercicios[nombre] = newExercise;
+      debugPrint('✨ INMEDIATO en initState: Ejercicio añadido al mapa: $nombre -> ${newExercise.summaryLabel}');
+    } catch (e) {
+      debugPrint('❌ ERROR en _processNewlySavedExercise: $e');
+    }
+  }
+
   Future<void> _loadExercisePlan({DateTime? forDate}) async {
     final date = forDate ?? _selectedDate;
     
-    debugPrint('🔄 Cargando todos los ejercicios para ${date.weekday}');
+    debugPrint('🔄 _loadExercisePlan START - fecha=${date.toString()}');
+    
+    setState(() => _isLoadingSentadillas = true);
     
     try {
-      setState(() => _isLoadingSentadillas = true);
+      // Comenzar con los ejercicios ya en memoria (incluyendo newlySavedExercise procesado en initState)
+      Map<String, ExercisePlan> nuevosEjercicios = Map.from(_ejercicios);
       
-      // Cargar todos los ejercicios en un mapa unificado
-      Map<String, ExercisePlan> nuevosEjercicios = {};
-      
-      // Cargar sentadillas
-      final SentadillasPlan? sentadillas = await _scheduleService.loadSentadillasPlan(
-        weekday: date.weekday,
-      );
-      if (!mounted) return;
-      
-      if (sentadillas != null) {
-        debugPrint('✅ Sentadillas cargadas: ${sentadillas.summaryLabel}');
-        // Convertir SentadillasPlan a ExercisePlan y agregarlo al mapa
-        final ExercisePlan sentadillasAsExercise = ExercisePlan(
-          weekday: sentadillas.weekday,
-          hour: sentadillas.hour,
-          minute: sentadillas.minute,
-          period: sentadillas.period,
-          difficulty: sentadillas.difficulty,
-          repetitions: sentadillas.repetitions,
-          weight: sentadillas.weight,
-          exerciseName: 'Sentadillas',
-          completed: sentadillas.completed,
-        );
-        nuevosEjercicios['Sentadillas'] = sentadillasAsExercise;
-      }
-      
-      // Cargar todos los ejercicios genéricos
-      for (String nombreEjercicio in EJERCICIOS_GENERICOS) {
-        try {
-          final ExercisePlan? plan = await _scheduleService.loadExercisePlan(
-            exerciseName: nombreEjercicio,
-            weekday: date.weekday,
-          );
-          if (plan != null) {
-            debugPrint('✅ $nombreEjercicio cargado: ${plan.summaryLabel}');
-            nuevosEjercicios[nombreEjercicio] = plan;
-          }
-        } catch (e) {
-          debugPrint('⚠️ No se pudo cargar $nombreEjercicio: $e');
-        }
-      }
-      
-      // Cargar ejercicios completados
-      Set<String> completados = {};
+      // ✅ ÚNICA FUENTE: Cargar ejercicios guardados por fecha (cardio + fuerza)
       try {
-        completados = await _scheduleService.loadCompletedExercises(
-          weekday: date.weekday,
-        );
-        debugPrint('📋 Ejercicios completados: $completados');
+        final saved = await _scheduleService.loadExercisesForDate(fecha: date);
+        debugPrint('📥 Cargar desde BD: ${saved.length} ejercicios');
+        
+        for (final Map<String, dynamic> row in saved) {
+          try {
+            final String nombre = (row['nombre'] as String?) ?? 'Ejercicio';
+            final int hora = (row['hora'] is num) ? (row['hora'] as num).toInt() : 9;
+            final bool completado = (row['completado'] as bool?) ?? false;
+
+            // Dificultad: int 1-3 o string "Baja/Media/Alta"
+            String dificultadLabel = 'Media';
+            final Object? dif = row['dificultad'];
+            if (dif is num) {
+              final int dv = (dif as num).toInt();
+              if (dv == 1) dificultadLabel = 'Baja';
+              else if (dv == 3) dificultadLabel = 'Alta';
+              else dificultadLabel = 'Media';
+            } else if (dif is String) {
+              dificultadLabel = dif;
+            }
+
+            String repetitionsLabel = '';
+            String weightLabel = '';
+
+            final String tipo = (row['tipo'] as String?) ?? 'cardio';
+            if (tipo == 'cardio') {
+              final Object? tiempo = row['tiempo_minutos'];
+              repetitionsLabel = (tiempo != null) ? '${tiempo.toString()} min' : '';
+            } else {
+              final Object? reps = row['repeticiones'];
+              final Object? peso = row['peso'];
+              repetitionsLabel = (reps != null) ? reps.toString() : '';
+              weightLabel = (peso != null) ? '${peso.toString()} kg' : '';
+            }
+
+            final int hour12 = (hora % 12 == 0) ? 12 : hora % 12;
+            final String period = hora >= 12 ? 'PM' : 'AM';
+
+            final ExercisePlan planFromSaved = ExercisePlan(
+              weekday: date.weekday,
+              hour: hour12,
+              minute: 0,
+              period: period,
+              difficulty: dificultadLabel,
+              repetitions: repetitionsLabel.isNotEmpty ? repetitionsLabel : '0',
+              weight: weightLabel,
+              exerciseName: nombre,
+              completed: completado,
+            );
+
+            nuevosEjercicios[nombre] = planFromSaved;
+            debugPrint('  ✅ $nombre (completado=$completado)');
+          } catch (e) {
+            debugPrint('  ⚠️ Error: $e');
+          }
+        }
       } catch (e) {
-        debugPrint('⚠️ No se pudieron cargar los completados: $e');
+        debugPrint('❌ Error al cargar: $e');
       }
       
       if (!mounted) return;
+      
       setState(() {
         _ejercicios = nuevosEjercicios;
-        _ejerciciosCompletados = completados;
         _isLoadingSentadillas = false;
       });
       
-      debugPrint('📊 Total ejercicios cargados: ${nuevosEjercicios.length}, completados: ${completados.length}');
+      debugPrint('✅ Cargados ${nuevosEjercicios.length} ejercicios: ${nuevosEjercicios.keys.toList()}');
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       setState(() => _isLoadingSentadillas = false);
-      debugPrint('❌ Error al cargar ejercicios: $error');
+      debugPrint('❌ Error: $error');
     }
   }
 
@@ -471,7 +539,7 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
                                             child: item == null
                                                 ? SizedBox(height: 44 * scale)
                                                 : GestureDetector(
-                                                    onTap: item.exerciseName != null
+                                                    onTap: item.exerciseName != null && !item.isCompleted
                                                         ? () => _showMarkCompleteDialog(item.exerciseName!)
                                                         : null,
                                                     child: Container(
@@ -479,45 +547,48 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
                                                       width: double.infinity,
                                                       padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 12 * scale),
                                                       decoration: BoxDecoration(
-                                                        color: item.color.withValues(
-                                                          alpha: item.isCompleted ? 0.4 : 1.0,
-                                                        ),
+                                                        color: item.isCompleted
+                                                            ? const Color(0xFF4CAF50).withValues(alpha: 0.6)
+                                                            : item.color.withValues(alpha: 1.0),
                                                         borderRadius: BorderRadius.circular(24 * scale),
                                                       ),
-                                                      child: Row(
-                                                        children: [
-                                                          Container(
-                                                            width: 10 * scale,
-                                                            height: 10 * scale,
-                                                            decoration: BoxDecoration(
-                                                              shape: BoxShape.circle,
-                                                              color: item.isCompleted
-                                                                  ? const Color(0xFF4CAF50)
-                                                                  : Colors.white,
+                                                      child: Opacity(
+                                                        opacity: item.isCompleted ? 0.65 : 1.0,
+                                                        child: Row(
+                                                          children: [
+                                                            Container(
+                                                              width: 10 * scale,
+                                                              height: 10 * scale,
+                                                              decoration: BoxDecoration(
+                                                                shape: BoxShape.circle,
+                                                                color: item.isCompleted
+                                                                    ? const Color(0xFFFFFFFF)
+                                                                    : Colors.white,
+                                                              ),
+                                                              child: item.isCompleted
+                                                                  ? Icon(
+                                                                      Icons.check,
+                                                                      color: const Color(0xFF4CAF50),
+                                                                      size: 6 * scale,
+                                                                    )
+                                                                  : null,
                                                             ),
-                                                            child: item.isCompleted
-                                                                ? Icon(
-                                                                    Icons.check,
-                                                                    color: Colors.white,
-                                                                    size: 6 * scale,
-                                                                  )
-                                                                : null,
-                                                          ),
-                                                          SizedBox(width: 10 * scale),
-                                                          Expanded(
-                                                            child: Text(
-                                                              item.exercise,
-                                                              style: TextStyle(
-                                                                color: Colors.white,
-                                                                fontSize: Responsive.fs(context, 13),
-                                                                fontWeight: FontWeight.w600,
-                                                                decoration: item.isCompleted
-                                                                    ? TextDecoration.lineThrough
-                                                                    : TextDecoration.none,
+                                                            SizedBox(width: 10 * scale),
+                                                            Expanded(
+                                                              child: Text(
+                                                                item.exercise,
+                                                                style: TextStyle(
+                                                                  color: Colors.white,
+                                                                  fontSize: Responsive.fs(context, 13),
+                                                                  fontWeight: FontWeight.w600,
+                                                                  decoration: item.isCompleted
+                                                                      ? TextDecoration.lineThrough
+                                                                      : TextDecoration.none,
+                                                                ),
                                                               ),
                                                             ),
-                                                          ),
-                                                        ],
+                                                          ],
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
@@ -704,6 +775,13 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
             TextButton(
               onPressed: () async {
                 Navigator.pop(context);
+                await _removeExercise(exerciseName);
+              },
+              child: const Text('Remover', style: TextStyle(color: Colors.red)),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
                 await _markExerciseComplete(exerciseName);
               },
               child: const Text('Sí, completado'),
@@ -716,28 +794,76 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
 
   Future<void> _markExerciseComplete(String exerciseName) async {
     try {
-      debugPrint('📝 Marcando $exerciseName como completado para día ${_selectedDate.weekday}');
+      debugPrint('📝 Marcando $exerciseName como completado para fecha ${_selectedDate}');
       
-      await _scheduleService.markRoutineCompleted(
-        weekday: _selectedDate.weekday,
-        exerciseLabel: exerciseName,
+      // Usar el nuevo método que solo actualiza el campo completado
+      await _scheduleService.markExerciseCompleted(
+        nombre: exerciseName,
+        fecha: _selectedDate,
       );
       
       debugPrint('✅ $exerciseName marcado como completado');
       
-      // Recargar los ejercicios para actualizar la UI
+      // Recargar los ejercicios para actualizar la UI inmediatamente
       if (!mounted) return;
       await _loadExercisePlan(forDate: _selectedDate);
       
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$exerciseName marcado como completado')),
+        SnackBar(
+          content: Text('✅ $exerciseName marcado como completado'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
       );
     } catch (e) {
       debugPrint('❌ Error al marcar $exerciseName como completado: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeExercise(String exerciseName) async {
+    try {
+      debugPrint('🗑️ Eliminando $exerciseName de la fecha ${_selectedDate}');
+      
+      await _scheduleService.deleteExercise(
+        nombre: exerciseName,
+        fecha: _selectedDate,
+      );
+      
+      debugPrint('✅ $exerciseName eliminado');
+      
+      // Remover inmediatamente del mapa local para actualizar la UI
+      setState(() {
+        _ejercicios.remove(exerciseName);
+      });
+      
+      // Luego recargar desde la BD por si acaso
+      if (!mounted) return;
+      await _loadExercisePlan(forDate: _selectedDate);
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🗑️ $exerciseName eliminado'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ Error al eliminar $exerciseName: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al eliminar: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -1094,23 +1220,27 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
   List<_ScheduleItem> _scheduleForDate(DateTime date) {
     final int weekday = date.weekday;
     List<_ScheduleItem> items = [];
+    
+    debugPrint('📋 _scheduleForDate LLAMADO - fecha=$date, weekday=$weekday, _ejercicios.keys=${_ejercicios.keys.toList()}');
 
     // Agregar todos los ejercicios cargados del mapa unificado
     for (var entry in _ejercicios.entries) {
       final String nombre = entry.key;
       final ExercisePlan ejercicio = entry.value;
-      final bool isCompleted = _ejerciciosCompletados.contains(nombre);
+      // Usar el estado completado del objeto ExercisePlan, no del Set
       items.add(_ScheduleItem(
         time: ejercicio.timeLabel,
         exercise: ejercicio.summaryLabel,
         color: const Color(0xFF70E0F0),
         exerciseName: nombre,
-        isCompleted: isCompleted,
+        isCompleted: ejercicio.completed,
       ));
+      debugPrint('📋 Agregado item: $nombre -> ${ejercicio.summaryLabel} (completado=${ejercicio.completed})');
     }
 
     // Si hay ejercicios cargados, retornarlos
     if (items.isNotEmpty) {
+      debugPrint('📋 Retornando ${items.length} items del mapa');
       return items;
     }
 
@@ -1334,4 +1464,6 @@ class _DetailRow extends StatelessWidget {
       ),
     );
   }
+
+
 }

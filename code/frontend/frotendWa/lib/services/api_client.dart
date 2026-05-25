@@ -84,7 +84,6 @@ class ApiClient {
     final token = getToken();
     if (needsAuth && token != null) {
       headers['Authorization'] = 'Bearer $token';
-      debugPrint('📤 Authorization header: Bearer ${token.substring(0, 20)}...');
     }
     
     return headers;
@@ -154,6 +153,50 @@ class ApiClient {
       return response;
     } catch (e) {
       throw Exception('Error en PUT $endpoint: $e');
+    }
+  }
+
+  Future<http.Response> patch(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    bool needsAuth = true,
+  }) async {
+    try {
+      // Asegurar que el token esté cargado
+      if (needsAuth && _token == null) {
+        await loadToken();
+      }
+      
+      final response = await http.patch(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: _getHeaders(needsAuth: needsAuth),
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 30));
+      
+      return response;
+    } catch (e) {
+      throw Exception('Error en PATCH $endpoint: $e');
+    }
+  }
+
+  Future<http.Response> delete(
+    String endpoint, {
+    bool needsAuth = true,
+  }) async {
+    try {
+      // Asegurar que el token esté cargado
+      if (needsAuth && _token == null) {
+        await loadToken();
+      }
+      
+      final response = await http.delete(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: _getHeaders(needsAuth: needsAuth),
+      ).timeout(const Duration(seconds: 30));
+      
+      return response;
+    } catch (e) {
+      throw Exception('Error en DELETE $endpoint: $e');
     }
   }
 }
