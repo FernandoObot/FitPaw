@@ -150,4 +150,43 @@ public class PetService {
         if (k.equals("coctel") || k.equals("cocktail")) return 50;
         return 0;
     }
+
+    /**
+     * Obtiene el inventario de comidas para una mascota
+     */
+    public java.util.List<com.fitpaw.backend.DTOs.PetFoodResponse> getPetFoods(int usuarioId) {
+        try (Connection conn = conexionDB.conectar()) {
+            // Obtener mascota_id del usuario
+            String sqlMascota = "SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ? LIMIT 1";
+            int mascotaId = -1;
+            try (PreparedStatement ps = conn.prepareStatement(sqlMascota)) {
+                ps.setInt(1, usuarioId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        mascotaId = rs.getInt("mascota_id");
+                    }
+                }
+            }
+
+            java.util.List<com.fitpaw.backend.DTOs.PetFoodResponse> foods = new java.util.ArrayList<>();
+            
+            if (mascotaId > 0) {
+                String sqlFoods = "SELECT nombre_comida, cantidad, beneficio_puntos FROM public.mascota_alimento WHERE mascota_id = ? ORDER BY nombre_comida";
+                try (PreparedStatement ps = conn.prepareStatement(sqlFoods)) {
+                    ps.setInt(1, mascotaId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            String nombreComida = rs.getString("nombre_comida");
+                            Integer cantidad = rs.getInt("cantidad");
+                            Integer beneficioPuntos = rs.getInt("beneficio_puntos");
+                            foods.add(new com.fitpaw.backend.DTOs.PetFoodResponse(nombreComida, cantidad, beneficioPuntos));
+                        }
+                    }
+                }
+            }
+            return foods;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al obtener comidas: " + e.getMessage());
+        }
+    }
 }

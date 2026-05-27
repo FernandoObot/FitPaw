@@ -88,9 +88,13 @@ public class AuthService {
 
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        int id = rs.getInt(1);
+                        int usuarioId = rs.getInt(1);
+                        
+                        // 🔑 Usuario ya creado y confirmado, ahora crear mascota en transacción separada
+                        crearMascotaEnSegundoPlano(usuarioId);
+                        
                         RegisterResponse response = new RegisterResponse();
-                        response.setUsuarioId(id);
+                        response.setUsuarioId(usuarioId);
                         response.setNombreCompleto(nombreCompleto);
                         response.setTelefono(telefono);
                         response.setRol(defaultRole);
@@ -297,4 +301,104 @@ public class AuthService {
             throw new IllegalStateException("Error al obtener perfil: " + e.getMessage());
         }
     }
+
+    /**
+     * Crea una mascota por defecto cuando el usuario se registra
+     */
+    private void crearMascotaDefault(Connection conn, int usuarioId) throws SQLException {
+        // Verificar si ya existe mascota para este usuario
+        String checkMascotaSql = "SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ? LIMIT 1";
+        try (PreparedStatement psCheck = conn.prepareStatement(checkMascotaSql)) {
+            psCheck.setInt(1, usuarioId);
+            try (ResultSet rs = psCheck.executeQuery()) {
+                if (rs.next()) {
+                    System.out.println("⚠️ Mascota ya existe para usuario " + usuarioId);
+                    return; // Ya existe, no crear de nuevo
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Error al verificar mascota existente: " + e.getMessage());
+            throw e;
+        }
+        
+        java.sql.Date hoy = new java.sql.Date(System.currentTimeMillis());
+        
+        String insertMascotaSql = "INSERT INTO public.mascota_estado (usuario_id, nombre, hambre, ultima_vez_alimentado, nivel, experiencia_actual) VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement ps = conn.prepareStatement(insertMascotaSql)) {
+            ps.setInt(1, usuarioId);
+            ps.setString(2, "Pingui"); // Nombre por defecto
+            ps.setInt(3, 100); // Hambre máximo
+            ps.setDate(4, hoy); // Última alimentación = hoy
+            ps.setInt(5, 1); // Nivel inicial
+            ps.setInt(6, 0); // Experiencia inicial
+            ps.executeUpdate();
+            System.out.println("✅ Mascota creada para usuario " + usuarioId);
+        } catch (SQLException e) {
+            System.err.println("❌ Error al insertar mascota_estado: " + e.getMessage());
+            System.err.println("   SQL State: " + e.getSQLState() + " | Error Code: " + e.getErrorCode());
+            throw e;
+        }
+
+        // Obtener la mascota_id que se acaba de crear
+        String selectMascotaSql = "SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ? LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(selectMascotaSql)) {
+            ps.setInt(1, usuarioId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int mascotaId = rs.getInt("mascota_id");
+                    crearComidassDefault(conn, mascotaId);
+                }
+            }
+        }
+    }
+
+    /**
+     * Crea las 4 comidas por defecto (con cantidad 0) para una mascota
+     */
+    private void crearComidassDefault(Connection conn, int mascotaId) throws SQLException {
+        String[] comidas = {"Krill", "Pez", "Calamar", "Coctel"};
+        int[] beneficios = {15, 25, 50, 100};
+
+        String insertComidaSql = "INSERT INTO public.mascota_alimento (mascota_id, nombre_comida, cantidad, beneficio_puntos) VALUES (?, ?, ?, ?)";
+        
+        for (int i = 0; i < comidas.length; i++) {
+            try (PreparedStatement ps = conn.prepareStatement(insertComidaSql)) {
+                ps.setInt(1, mascotaId);
+                ps.setString(2, comidas[i]);
+                ps.setInt(3, 0); // Cantidad inicial = 0
+                ps.setInt(4, beneficios[i]);
+                ps.executeUpdate();
+                System.out.println("  ✅ Comida creada: " + comidas[i] + " (mascota_id=" + mascotaId + ")");
+            } catch (SQLException e) {
+                System.err.println("  ❌ Error al crear comida " + comidas[i] + ": " + e.getMessage());
+                System.err.println("     SQL State: " + e.getSQLState() + " | Error Code: " + e.getErrorCode());
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * Crea la mascota en una transacción SEPARADA
+     * El usuario ya fue confirmado, así que si falla aquí, el usuario sigue existiendo
+     */
+    private void crearMascotaEnSegundoPlano(int usuarioId) {
+        // Ejecutar en thread separado para no bloquear el registro
+        new Thread(() -> {
+            try {
+                // Nueva conexión - transacción separada
+                try (Connection conn = conexionDB.conectar()) {
+                    crearMascotaDefault(conn, usuarioId);
+                    System.out.println("✅ [ASYNC] Mascota y comidas creadas exitosamente para usuario " + usuarioId);
+                }
+            } catch (SQLException e) {
+                System.err.println("⚠️ [ASYNC] Error creando mascota para usuario " + usuarioId + ": " + e.getMessage());
+                System.err.println("⚠️ [ASYNC] SQL State: " + e.getSQLState());
+                System.err.println("⚠️ [ASYNC] Error Code: " + e.getErrorCode());
+                e.printStackTrace();
+                // El usuario sigue existiendo, solo no tiene mascota
+                // En el login podemos detectar esto y crear la mascota
+            }
+        }).start();
+    }
+
 }

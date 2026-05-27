@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
+import '../../services/api_client.dart';
 import '../widgets/responsive.dart';
 
 class PetScreen extends StatefulWidget {
@@ -56,14 +57,22 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
   Timer? _throwFoodTimer;
   
   String? _throwFoodKey;
-  // Food counts for each food type (frontend only)
-  final Map<String, int> _foodCounts = {
-    'pez': 5,
-    'camaron': 5,
-    'calamar': 5,
-    'coctel': 5,
+  
+  // Datos de la mascota desde el backend
+  Map<String, dynamic>? _petStatus;
+  List<Map<String, dynamic>> _foodInventory = [];
+  bool _isLoadingPet = true;
+  String _loadErrorMessage = '';
+  
+  // Mapeo de nombres de comida del backend
+  Map<String, String> get _foodNameMapping => {
+    'Pez': 'pez',
+    'Krill': 'camaron',
+    'Calamar': 'calamar',
+    'Coctel': 'coctel',
   };
-  double _foodLevel = 100;
+  
+  double get _foodLevel => _petStatus?['hambre']?.toDouble() ?? 100;
   String _statusMessage = '';
   String _penguinAsset = _defaultHappy;
   // Which outfit is applied: null = none, 0 = conjunto1, 1 = conjunto2
@@ -103,8 +112,39 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
     super.initState();
     _nameController = TextEditingController(text: _petName);
     _ensureSnow();
-    _scheduleHungerTimers();
+    _loadPetData();
     _updatePenguinByLevel();
+  }
+
+  /// Carga los datos de la mascota desde el backend
+  Future<void> _loadPetData() async {
+    try {
+      setState(() => _isLoadingPet = true);
+      
+      // Cargar estado de mascota y comidas en paralelo
+      final petStatus = await ApiClient().getPetStatus();
+      final foods = await ApiClient().getPetFoods();
+      
+      setState(() {
+        _petStatus = petStatus;
+        _foodInventory = foods;
+        _petName = petStatus['nombre'] ?? 'Pingui';
+        _nameController.text = _petName;
+        _isLoadingPet = false;
+        _loadErrorMessage = '';
+      });
+      
+      debugPrint('✅ Datos de mascota cargados: ${_petName}, hambre=${_foodLevel.toInt()}');
+      debugPrint('🍽️ Comidas cargadas: ${_foodInventory.length} tipos');
+      
+      _updatePenguinByLevel();
+    } catch (e) {
+      setState(() {
+        _isLoadingPet = false;
+        _loadErrorMessage = 'Error: $e';
+      });
+      debugPrint('❌ Error cargando mascota: $e');
+    }
   }
 
   @override
@@ -133,41 +173,6 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
       timer.cancel();
     }
     _hungerTimers.clear();
-  }
-
-  void _scheduleHungerTimers() {
-    _cancelHungerTimers();
-
-    _hungerTimers.addAll([
-      Timer(const Duration(seconds: 10), () {
-        if (!mounted) {
-          return;
-        }
-        setState(() => _foodLevel = 75);
-        _updatePenguinByLevel();
-      }),
-      Timer(const Duration(seconds: 15), () {
-        if (!mounted) {
-          return;
-        }
-        setState(() => _foodLevel = 50);
-        _updatePenguinByLevel();
-      }),
-      Timer(const Duration(seconds: 20), () {
-        if (!mounted) {
-          return;
-        }
-        setState(() => _foodLevel = 25);
-        _updatePenguinByLevel();
-      }),
-      Timer(const Duration(seconds: 25), () {
-        if (!mounted) {
-          return;
-        }
-        setState(() => _foodLevel = 0);
-        _updatePenguinByLevel();
-      }),
-    ]);
   }
 
   void _updatePenguinByLevel() {
@@ -231,35 +236,56 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
       setState(() => _throwFoodKey = null);
     });
   }
-  void _feedPet(String foodKey) {
-    final int available = _foodCounts[foodKey] ?? 0;
+
+  void _feedPet(String foodName) async {
+    // Encontrar la comida en el inventario
+    final foodData = _foodInventory.firstWhere(
+      (f) => (f['nombreComida'] as String?)?.toLowerCase() == foodName.toLowerCase(),
+      orElse: () => {},
+    );
+
+    final int available = (foodData['cantidad'] as int?) ?? 0;
     if (available <= 0) {
       setState(() {
         _statusMessage = 'No hay más de ese alimento';
       });
       return;
     }
-    _triggerFoodThrow(foodKey);
+
+    _triggerFoodThrow(foodName);
     _happyTimer?.cancel();
 
-    setState(() {
-      _foodCounts[foodKey] = available - 1;
-      _foodLevel = (_foodLevel + 25).clamp(0, 100).toDouble();
-      if (_appliedConjunto == 0) {
-        _penguinAsset = _conjunto1Happy;
-      } else if (_appliedConjunto == 1) {
-        _penguinAsset = _conjunto2Happy;
-      } else {
-        _penguinAsset = _defaultHappy;
-      }
-      _statusMessage = _feedMessages[_random.nextInt(_feedMessages.length)];
-    });
+    try {
+      // Llamar al backend para alimentar la mascota
+      final response = await ApiClient().feedPet(foodName);
+      
+      // Actualizar estado con la respuesta del backend
+      setState(() {
+        _petStatus = response;
+        _statusMessage = _feedMessages[_random.nextInt(_feedMessages.length)];
+        
+        if (_appliedConjunto == 0) {
+          _penguinAsset = _conjunto1Happy;
+        } else if (_appliedConjunto == 1) {
+          _penguinAsset = _conjunto2Happy;
+        } else {
+          _penguinAsset = _defaultHappy;
+        }
+      });
 
-    _scheduleHungerTimers();
+      debugPrint('✅ Mascota alimentada con $foodName, nuevo hambre: ${_foodLevel.toInt()}');
 
-    _happyTimer = Timer(const Duration(milliseconds: 900), () {
-      _updatePenguinByLevel();
-    });
+      // Recargar comidas después de 500ms para obtener el inventario actualizado
+      _happyTimer = Timer(const Duration(milliseconds: 900), () {
+        _loadPetData();
+        _updatePenguinByLevel();
+      });
+    } catch (e) {
+      debugPrint('❌ Error alimentando mascota: $e');
+      setState(() {
+        _statusMessage = 'Error al alimentar';
+      });
+    }
   }
 
   void _openCloset() {
@@ -310,8 +336,6 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
           'coctel': 'assets/images/Coctel de mariscos.png',
         };
 
-        
-
         return SafeArea(
           child: LayoutBuilder(builder: (context, constraints) {
             final double maxSheetHeight = constraints.maxHeight * 0.78;
@@ -350,28 +374,47 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
                           ),
                         ),
                         SizedBox(height: 16 * scale),
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: 4,
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 12 * scale,
-                            crossAxisSpacing: 12 * scale,
-                            childAspectRatio: 1,
+                        if (_isLoadingPet)
+                          Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.mintPrimary),
+                            ),
+                          )
+                        else if (_foodInventory.isEmpty)
+                          Center(
+                            child: Text(
+                              'Sin comida disponible',
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
+                          )
+                        else
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _foodInventory.length,
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 12 * scale,
+                              crossAxisSpacing: 12 * scale,
+                              childAspectRatio: 1,
+                            ),
+                            itemBuilder: (context, index) {
+                              final food = _foodInventory[index];
+                              final String foodName = food['nombreComida'] ?? '';
+                              final int cantidad = food['cantidad'] ?? 0;
+                              final String keyLower = foodName.toLowerCase();
+                              final String asset = assetMap[keyLower] ?? assetMap['pez'] ?? '';
+                              
+                              return _buildFoodTile(
+                                context,
+                                scale,
+                                foodName,
+                                asset,
+                                foodName,
+                                cantidad,
+                              );
+                            },
                           ),
-                          itemBuilder: (context, index) {
-                            final List<Map<String, String>> items = [
-                              {'key': 'pez', 'label': 'Pez', 'asset': assetMap['pez'] ?? ''},
-                              {'key': 'camaron', 'label': 'Camaron', 'asset': assetMap['camaron'] ?? ''},
-                              {'key': 'calamar', 'label': 'Calamar', 'asset': assetMap['calamar'] ?? ''},
-                              {'key': 'coctel', 'label': 'Coctel', 'asset': assetMap['coctel'] ?? ''},
-                            ];
-
-                            final item = items[index];
-                            return _buildFoodTile(context, scale, item['label']!, item['asset'], item['key']!);
-                          },
-                        ),
                         SizedBox(height: 8 * scale),
                         Align(
                           alignment: Alignment.centerRight,
@@ -399,14 +442,11 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
     );
   }
 
-  
-
-  Widget _buildFoodTile(BuildContext context, double scale, String label, String? asset, String key) {
-    final int count = _foodCounts[key] ?? 0;
+  Widget _buildFoodTile(BuildContext context, double scale, String label, String? asset, String foodName, int count) {
     return InkWell(
       onTap: () {
         Navigator.of(context).pop();
-        _feedPet(key);
+        _feedPet(foodName);
       },
       borderRadius: BorderRadius.circular(16 * scale),
       child: ClipRRect(
@@ -426,7 +466,7 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
                     padding: EdgeInsets.all(8 * scale),
                     child: SizedBox(
                       height: (88 * scale).clamp(56, 140),
-                      child: asset != null
+                      child: asset != null && asset.isNotEmpty
                           ? Image.asset(
                               asset,
                               fit: BoxFit.contain,
@@ -448,7 +488,6 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
                 child: Center(child: Text('$count', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
               ),
             ),
-            // label is omitted to match Closet tiles (image fills the block)
           ],
         ),
       ),

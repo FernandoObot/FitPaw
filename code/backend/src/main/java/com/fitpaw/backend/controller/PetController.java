@@ -45,4 +45,11 @@ public class PetController {
         PetStatusResponse resp = petService.feedPet(usuarioId, request);
         return ResponseEntity.ok(resp);
     }
+
+    @GetMapping("/foods")
+    public ResponseEntity<?> getFoods() {
+        int usuarioId = getUsuarioIdFromAuth();
+        java.util.List<com.fitpaw.backend.DTOs.PetFoodResponse> foods = petService.getPetFoods(usuarioId);
+        return ResponseEntity.ok(foods);
+    }
 }

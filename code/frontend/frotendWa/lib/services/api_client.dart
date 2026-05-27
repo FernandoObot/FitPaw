@@ -199,4 +199,41 @@ class ApiClient {
       throw Exception('Error en DELETE $endpoint: $e');
     }
   }
+
+  // ===================== MASCOTA ENDPOINTS =====================
+  
+  /// Obtiene el estado de la mascota del usuario
+  Future<Map<String, dynamic>> getPetStatus() async {
+    final response = await get('/pet/status', needsAuth: true);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Error al obtener estado de mascota: ${response.statusCode}');
+    }
+  }
+
+  /// Obtiene el inventario de comidas de la mascota
+  Future<List<Map<String, dynamic>>> getPetFoods() async {
+    final response = await get('/pet/foods', needsAuth: true);
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
+      return data.cast<Map<String, dynamic>>();
+    } else {
+      throw Exception('Error al obtener comidas: ${response.statusCode}');
+    }
+  }
+
+  /// Alimenta la mascota con un tipo de comida
+  Future<Map<String, dynamic>> feedPet(String itemName) async {
+    final response = await post(
+      '/pet/feed',
+      body: {'item': itemName},
+      needsAuth: true,
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Error al alimentar mascota: ${response.statusCode}');
+    }
+  }
 }

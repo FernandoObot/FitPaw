@@ -24,6 +24,9 @@ public class ExerciseService {
     @Autowired
     private ConexionDB conexionDB;
 
+    @Autowired
+    private StreakRewardService streakRewardService;
+
     /**
      * Guardar ejercicio cardio
      */
@@ -141,9 +144,16 @@ public class ExerciseService {
 
     /**
      * Marcar ejercicio como completado (actualizar campo completado a true)
+     * También gestiona rachas y recompensas
      */
     public void markExerciseCompleted(int usuarioId, String nombre, LocalDate fecha) {
+        System.out.println("\n=== MARCAR EJERCICIO COMPLETADO ===");
+        System.out.println("Usuario: " + usuarioId + ", Ejercicio: " + nombre + ", Fecha: " + fecha);
+        
         try (Connection conn = conexionDB.conectar()) {
+            // Marcar el ejercicio como completado
+            boolean ejercicioEncontrado = false;
+
             // Intentar actualizar en ejercicio_cardio
             String sqlCardio = "UPDATE public.ejercicio_cardio SET completado = true WHERE usuario_id = ? AND nombre = ? AND fecha = ?";
             try (PreparedStatement ps = conn.prepareStatement(sqlCardio)) {
@@ -153,23 +163,73 @@ public class ExerciseService {
                 
                 int rowsAffected = ps.executeUpdate();
                 if (rowsAffected > 0) {
-                    return; // Actualizado en cardio
+                    ejercicioEncontrado = true;
+                    System.out.println("✅ Ejercicio marcado en cardio");
                 }
             }
 
             // Si no encontró en cardio, intentar en ejercicio_fuerza
-            String sqlFuerza = "UPDATE public.ejercicio_fuerza SET completado = true WHERE usuario_id = ? AND nombre = ? AND fecha = ?";
-            try (PreparedStatement ps = conn.prepareStatement(sqlFuerza)) {
-                ps.setInt(1, usuarioId);
-                ps.setString(2, nombre);
-                ps.setDate(3, Date.valueOf(fecha));
-                
-                int rowsAffected = ps.executeUpdate();
-                if (rowsAffected == 0) {
-                    throw new IllegalArgumentException("No se encontró el ejercicio: " + nombre);
+            if (!ejercicioEncontrado) {
+                String sqlFuerza = "UPDATE public.ejercicio_fuerza SET completado = true WHERE usuario_id = ? AND nombre = ? AND fecha = ?";
+                try (PreparedStatement ps = conn.prepareStatement(sqlFuerza)) {
+                    ps.setInt(1, usuarioId);
+                    ps.setString(2, nombre);
+                    ps.setDate(3, Date.valueOf(fecha));
+                    
+                    int rowsAffected = ps.executeUpdate();
+                    if (rowsAffected == 0) {
+                        throw new IllegalArgumentException("No se encontró el ejercicio: " + nombre);
+                    }
+                    ejercicioEncontrado = true;
+                    System.out.println("✅ Ejercicio marcado en fuerza");
                 }
             }
+
+            if (!ejercicioEncontrado) {
+                throw new IllegalArgumentException("No se encontró el ejercicio: " + nombre);
+            }
+
+            // ===== SISTEMA DE RACHAS Y RECOMPENSAS =====
+            System.out.println("\n🏆 INICIANDO SISTEMA DE RECOMPENSAS...");
+
+            // 1. Verificar y actualizar racha (retorna true si es el primer ejercicio del día)
+            boolean esFirstPasoRacha = streakRewardService.verificarYActualizarRacha(conn, usuarioId, fecha);
+            System.out.println("Primer ejercicio del día: " + esFirstPasoRacha);
+
+            if (esFirstPasoRacha) {
+                // Es el primer ejercicio del día - la racha fue activada
+                // Recompensa: +1 Calamar (50 puntos)
+                System.out.println("🦑 Otorgando Calamar...");
+                streakRewardService.otorgarAlimento(conn, usuarioId, "Calamar", 1);
+
+                // Obtener los días de racha actual para revisar si es múltiplo de 5
+                int diasRacha = streakRewardService.obtenerDiasRachaActual(conn, usuarioId);
+                System.out.println("Días de racha actual: " + diasRacha);
+                
+                if (diasRacha > 0 && diasRacha % 5 == 0) {
+                    // Múltiplo de 5 días - dar Coctel
+                    System.out.println("🍸 Día múltiplo de 5! Otorgando Coctel...");
+                    streakRewardService.otorgarAlimento(conn, usuarioId, "Coctel", 1);
+                }
+            }
+
+            // 2. Dar Krill por completar este ejercicio
+            System.out.println("🦐 Otorgando Krill...");
+            streakRewardService.otorgarAlimento(conn, usuarioId, "Krill", 1);
+
+            // 3. Verificar si ya han completado los 4 ejercicios
+            System.out.println("🔍 Verificando si están los 4 ejercicios completados...");
+            if (streakRewardService.verificarLos4EjerciciosCompletados(conn, usuarioId, fecha)) {
+                // Dar 2 Peces (2 * 25 = 50 puntos)
+                System.out.println("🐟 ¡Los 4 ejercicios completados! Otorgando 2 Peces...");
+                streakRewardService.otorgarAlimento(conn, usuarioId, "Pez", 2);
+            }
+            
+            System.out.println("=== FIN DE RECOMPENSAS ===\n");
+
         } catch (SQLException e) {
+            System.err.println("❌ Error SQL: " + e.getMessage());
+            e.printStackTrace();
             throw new IllegalStateException("Error al marcar ejercicio como completado: " + e.getMessage());
         }
     }
