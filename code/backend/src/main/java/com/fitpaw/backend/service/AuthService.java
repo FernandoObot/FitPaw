@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.regex.Pattern;
@@ -47,6 +48,7 @@ public class AuthService {
     }
 
     public RegisterResponse register(RegisterRequest request) {
+        System.out.println("\n\n🔴🔴🔴 [REGISTER] INICIO DEL REGISTRO 🔴🔴🔴");
         if (request == null) {
             throw new IllegalArgumentException("El body de registro es obligatorio");
         }
@@ -54,6 +56,8 @@ public class AuthService {
         String nombreCompleto = clean(request.getNombreCompleto());
         String telefono = clean(request.getTelefono());
         String password = clean(request.getPassword());
+        
+        System.out.println("[REGISTER] Nombre: " + nombreCompleto + " | Teléfono: " + telefono);
 
         if (nombreCompleto.isEmpty() || telefono.isEmpty() || password.isEmpty()) {
             throw new IllegalArgumentException("Todos los campos son obligatorios");
@@ -89,9 +93,16 @@ public class AuthService {
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         int usuarioId = rs.getInt(1);
+                        System.out.println("✅ Usuario creado con ID: " + usuarioId);
                         
-                        // 🔑 Usuario ya creado y confirmado, ahora crear mascota en transacción separada
-                        crearMascotaEnSegundoPlano(usuarioId);
+                        // 🔑 Crear mascota en transacción SEPARADA pero ESPERAR resultado
+                        try {
+                            crearMascotaEnSegundoPlano(usuarioId);
+                            // Pequeña pausa para permitir que el thread inicie
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
                         
                         RegisterResponse response = new RegisterResponse();
                         response.setUsuarioId(usuarioId);
@@ -304,51 +315,60 @@ public class AuthService {
 
     /**
      * Crea una mascota por defecto cuando el usuario se registra
+     * Usa timestamp en lugar de date
      */
     private void crearMascotaDefault(Connection conn, int usuarioId) throws SQLException {
+        System.out.println("[MASCOTA] Iniciando creación para usuario " + usuarioId);
+        
         // Verificar si ya existe mascota para este usuario
-        String checkMascotaSql = "SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ? LIMIT 1";
+        String checkMascotaSql = "SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ?";
         try (PreparedStatement psCheck = conn.prepareStatement(checkMascotaSql)) {
             psCheck.setInt(1, usuarioId);
             try (ResultSet rs = psCheck.executeQuery()) {
                 if (rs.next()) {
-                    System.out.println("⚠️ Mascota ya existe para usuario " + usuarioId);
-                    return; // Ya existe, no crear de nuevo
+                    System.out.println("⚠️ [MASCOTA] Mascota ya existe para usuario " + usuarioId);
+                    return;
                 }
             }
         } catch (SQLException e) {
-            System.err.println("❌ Error al verificar mascota existente: " + e.getMessage());
+            System.err.println("❌ [MASCOTA] Error verificar mascota: " + e.getMessage());
+            e.printStackTrace();
             throw e;
         }
         
-        java.sql.Date hoy = new java.sql.Date(System.currentTimeMillis());
+        Timestamp ahora = Timestamp.valueOf(LocalDateTime.now());
         
-        String insertMascotaSql = "INSERT INTO public.mascota_estado (usuario_id, nombre, hambre, ultima_vez_alimentado, nivel, experiencia_actual) VALUES (?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(insertMascotaSql)) {
+        // 🔑 Sin RETURNING - usar RETURN_GENERATED_KEYS para columna IDENTITY
+        String insertMascotaSql = "INSERT INTO public.mascota_estado (usuario_id, nombre, hambre, ultima_vez_alimentado) VALUES (?, ?, ?, ?)";
+        int mascotaId = -1;
+        try (PreparedStatement ps = conn.prepareStatement(insertMascotaSql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, usuarioId);
-            ps.setString(2, "Pingui"); // Nombre por defecto
-            ps.setInt(3, 100); // Hambre máximo
-            ps.setDate(4, hoy); // Última alimentación = hoy
-            ps.setInt(5, 1); // Nivel inicial
-            ps.setInt(6, 0); // Experiencia inicial
+            ps.setString(2, "Pingui");
+            ps.setInt(3, 100);
+            ps.setTimestamp(4, ahora);
+            
             ps.executeUpdate();
-            System.out.println("✅ Mascota creada para usuario " + usuarioId);
+            
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) {
+                    mascotaId = rs.getInt(1);
+                    System.out.println("✅ [MASCOTA] INSERT mascota_estado: mascota_id=" + mascotaId + " para usuario " + usuarioId);
+                } else {
+                    throw new SQLException("No se retornó mascota_id después del INSERT");
+                }
+            }
         } catch (SQLException e) {
-            System.err.println("❌ Error al insertar mascota_estado: " + e.getMessage());
-            System.err.println("   SQL State: " + e.getSQLState() + " | Error Code: " + e.getErrorCode());
+            System.err.println("❌ [MASCOTA] Error INSERT mascota_estado: " + e.getMessage());
+            System.err.println("    SQL: " + e.getSQLState() + " | Code: " + e.getErrorCode());
+            e.printStackTrace();
             throw e;
         }
 
-        // Obtener la mascota_id que se acaba de crear
-        String selectMascotaSql = "SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ? LIMIT 1";
-        try (PreparedStatement ps = conn.prepareStatement(selectMascotaSql)) {
-            ps.setInt(1, usuarioId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    int mascotaId = rs.getInt("mascota_id");
-                    crearComidassDefault(conn, mascotaId);
-                }
-            }
+        if (mascotaId > 0) {
+            System.out.println("[MASCOTA] Creando comidas para mascota_id=" + mascotaId);
+            crearComidassDefault(conn, mascotaId);
+        } else {
+            throw new SQLException("mascota_id no fue generado correctamente");
         }
     }
 
@@ -356,6 +376,7 @@ public class AuthService {
      * Crea las 4 comidas por defecto (con cantidad 0) para una mascota
      */
     private void crearComidassDefault(Connection conn, int mascotaId) throws SQLException {
+        System.out.println("[COMIDAS] Iniciando creación para mascota " + mascotaId);
         String[] comidas = {"Krill", "Pez", "Calamar", "Coctel"};
         int[] beneficios = {15, 25, 50, 100};
 
@@ -365,16 +386,18 @@ public class AuthService {
             try (PreparedStatement ps = conn.prepareStatement(insertComidaSql)) {
                 ps.setInt(1, mascotaId);
                 ps.setString(2, comidas[i]);
-                ps.setInt(3, 0); // Cantidad inicial = 0
+                ps.setInt(3, 0);
                 ps.setInt(4, beneficios[i]);
-                ps.executeUpdate();
-                System.out.println("  ✅ Comida creada: " + comidas[i] + " (mascota_id=" + mascotaId + ")");
+                int rows = ps.executeUpdate();
+                System.out.println("  ✅ [COMIDAS] " + comidas[i] + ": " + rows + " filas");
             } catch (SQLException e) {
-                System.err.println("  ❌ Error al crear comida " + comidas[i] + ": " + e.getMessage());
-                System.err.println("     SQL State: " + e.getSQLState() + " | Error Code: " + e.getErrorCode());
+                System.err.println("  ❌ [COMIDAS] Error " + comidas[i] + ": " + e.getMessage());
+                System.err.println("     SQL: " + e.getSQLState() + " | Code: " + e.getErrorCode());
+                e.printStackTrace();
                 throw e;
             }
         }
+        System.out.println("✅ [COMIDAS] Todas las comidas creadas para mascota " + mascotaId);
     }
 
     /**
@@ -383,22 +406,23 @@ public class AuthService {
      */
     private void crearMascotaEnSegundoPlano(int usuarioId) {
         // Ejecutar en thread separado para no bloquear el registro
-        new Thread(() -> {
+        Thread mascotaThread = new Thread(() -> {
             try {
-                // Nueva conexión - transacción separada
+                System.out.println("[ASYNC] 🚀 Thread iniciado para usuario " + usuarioId);
                 try (Connection conn = conexionDB.conectar()) {
+                    System.out.println("[ASYNC] 🔗 Conexión obtenida");
                     crearMascotaDefault(conn, usuarioId);
-                    System.out.println("✅ [ASYNC] Mascota y comidas creadas exitosamente para usuario " + usuarioId);
+                    System.out.println("[ASYNC] ✅ Mascota y comidas creadas para usuario " + usuarioId);
                 }
-            } catch (SQLException e) {
-                System.err.println("⚠️ [ASYNC] Error creando mascota para usuario " + usuarioId + ": " + e.getMessage());
-                System.err.println("⚠️ [ASYNC] SQL State: " + e.getSQLState());
-                System.err.println("⚠️ [ASYNC] Error Code: " + e.getErrorCode());
+            } catch (Exception e) {
+                System.err.println("[ASYNC] ❌ Error para usuario " + usuarioId + ": " + e.getMessage());
                 e.printStackTrace();
-                // El usuario sigue existiendo, solo no tiene mascota
-                // En el login podemos detectar esto y crear la mascota
             }
-        }).start();
+        }, "MascotaCreator-" + usuarioId);
+        
+        mascotaThread.setDaemon(false);
+        mascotaThread.start();
+        System.out.println("[MAIN] Thread lanzado para mascota del usuario " + usuarioId);
     }
 
 }

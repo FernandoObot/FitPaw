@@ -29,7 +29,8 @@ public class PetService {
 
     public PetStatusResponse getPetStatus(int usuarioId) {
         try (Connection conn = conexionDB.conectar()) {
-            String sql = "SELECT mascota_id, nombre, nivel, experiencia_actual, hambre, ultima_vez_alimentado FROM public.mascota_estado WHERE usuario_id = ?";
+            // 🔑 SELECT solo con campos que existen en BD
+            String sql = "SELECT mascota_id, nombre, hambre, ultima_vez_alimentado FROM public.mascota_estado WHERE usuario_id = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, usuarioId);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -37,8 +38,6 @@ public class PetService {
                         PetStatusResponse res = new PetStatusResponse();
                         res.setMascotaId(rs.getInt("mascota_id"));
                         res.setNombre(rs.getString("nombre"));
-                        res.setNivel(rs.getInt("nivel"));
-                        res.setExperienciaActual(rs.getInt("experiencia_actual"));
                         Integer storedHunger = rs.getObject("hambre") != null ? rs.getInt("hambre") : 100;
                         Timestamp last = rs.getTimestamp("ultima_vez_alimentado");
                         int current = computeHunger(storedHunger, last);
@@ -52,8 +51,6 @@ public class PetService {
                         PetStatusResponse res = new PetStatusResponse();
                         res.setMascotaId(null);
                         res.setNombre(null);
-                        res.setNivel(1);
-                        res.setExperienciaActual(0);
                         res.setHambre(100);
                         res.setUltimaVezAlimentado(null);
                         return res;
