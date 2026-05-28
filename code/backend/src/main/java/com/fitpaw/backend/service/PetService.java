@@ -186,4 +186,60 @@ public class PetService {
             throw new IllegalStateException("Error al obtener comidas: " + e.getMessage());
         }
     }
+
+    /**
+     * Actualiza el nombre de la mascota
+     */
+    public PetStatusResponse updatePetName(int usuarioId, String nuevoNombre) {
+        if (nuevoNombre == null || nuevoNombre.trim().isEmpty()) {
+            throw new IllegalArgumentException("El nombre no puede estar vacío");
+        }
+
+        String nombreLimpio = nuevoNombre.trim();
+        if (nombreLimpio.length() > 50) {
+            throw new IllegalArgumentException("El nombre no puede exceder 50 caracteres");
+        }
+
+        try (Connection conn = conexionDB.conectar()) {
+            String sql = "UPDATE public.mascota_estado SET nombre = ? WHERE usuario_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, nombreLimpio);
+                ps.setInt(2, usuarioId);
+                int updated = ps.executeUpdate();
+                if (updated == 0) {
+                    throw new IllegalStateException("Mascota no encontrada para el usuario");
+                }
+            }
+
+            return getPetStatus(usuarioId);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al actualizar nombre de mascota: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Establece el nivel de hambre de la mascota
+     */
+    public PetStatusResponse setHungerLevel(int usuarioId, int nuevoHambre) {
+        if (nuevoHambre < 0 || nuevoHambre > 100) {
+            throw new IllegalArgumentException("El hambre debe estar entre 0 y 100");
+        }
+
+        try (Connection conn = conexionDB.conectar()) {
+            String sql = "UPDATE public.mascota_estado SET hambre = ?, ultima_vez_alimentado = ? WHERE usuario_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, nuevoHambre);
+                ps.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
+                ps.setInt(3, usuarioId);
+                int updated = ps.executeUpdate();
+                if (updated == 0) {
+                    throw new IllegalStateException("Mascota no encontrada para el usuario");
+                }
+            }
+
+            return getPetStatus(usuarioId);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al actualizar hambre de mascota: " + e.getMessage());
+        }
+    }
 }

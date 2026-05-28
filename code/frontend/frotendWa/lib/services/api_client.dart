@@ -236,4 +236,18 @@ class ApiClient {
       throw Exception('Error al alimentar mascota: ${response.statusCode}');
     }
   }
+
+  /// Actualiza el nombre de la mascota
+  Future<Map<String, dynamic>> updatePetName(String nuevoNombre) async {
+    final response = await put(
+      '/pet/name',
+      body: {'nombre': nuevoNombre},
+      needsAuth: true,
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Error al actualizar nombre de mascota: ${response.statusCode}');
+    }
+  }
 }

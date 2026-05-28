@@ -138,6 +138,9 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
       debugPrint('🍽️ Comidas cargadas: ${_foodInventory.length} tipos');
       
       _updatePenguinByLevel();
+      
+      // Iniciar timer de descenso de hambre
+      _startHungerDecreaseTimer();
     } catch (e) {
       setState(() {
         _isLoadingPet = false;
@@ -173,6 +176,43 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
       timer.cancel();
     }
     _hungerTimers.clear();
+  }
+
+  /// Inicia el timer para disminuir el hambre cada 60 segundos (1 punto por minuto)
+  void _startHungerDecreaseTimer() {
+    _cancelHungerTimers();
+    
+    final timer = Timer.periodic(const Duration(seconds: 60), (_) async {
+      if (!mounted || _petStatus == null) return;
+      
+      final currentHunger = _foodLevel.toInt();
+      
+      if (currentHunger > 0) {
+        final newHunger = (currentHunger - 1).clamp(0, 100);
+        
+        debugPrint('🍽️ Hambre disminuyendo: $currentHunger → $newHunger');
+        
+        try {
+          // Actualizar en BD
+          final response = await ApiClient().post(
+            '/pet/hunger-decrease',
+            body: {'cantidad': newHunger},
+            needsAuth: true,
+          );
+          
+          // Actualizar UI
+          setState(() {
+            _petStatus?['hambre'] = newHunger;
+          });
+          
+          _updatePenguinByLevel();
+        } catch (e) {
+          debugPrint('❌ Error disminuyendo hambre: $e');
+        }
+      }
+    });
+    
+    _hungerTimers.add(timer);
   }
 
   void _updatePenguinByLevel() {
@@ -331,6 +371,7 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
         final double scale = Responsive.scale(context);
         final Map<String, String> assetMap = {
           'pez': 'assets/images/Pez.png',
+          'krill': 'assets/images/Camaron.png',
           'camaron': 'assets/images/Camaron.png',
           'calamar': 'assets/images/Calamar.png',
           'coctel': 'assets/images/Coctel de mariscos.png',
@@ -497,8 +538,9 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
   void _toggleNameEditing() {
     if (_isEditingName) {
       final String nextName = _nameController.text.trim();
-      if (nextName.isNotEmpty) {
-        setState(() => _petName = nextName);
+      if (nextName.isNotEmpty && nextName != _petName) {
+        // Guardar en BD
+        _savePetName(nextName);
       }
       setState(() => _isEditingName = false);
       _nameFocus.unfocus();
@@ -508,6 +550,20 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
         ..text = _petName
         ..selection = TextSelection(baseOffset: 0, extentOffset: _petName.length);
       _nameFocus.requestFocus();
+    }
+  }
+
+  Future<void> _savePetName(String nuevoNombre) async {
+    try {
+      final response = await ApiClient().updatePetName(nuevoNombre);
+      setState(() {
+        _petName = response['nombre'] ?? nuevoNombre;
+      });
+      debugPrint('✅ Nombre de mascota actualizado a: $_petName');
+    } catch (e) {
+      debugPrint('❌ Error al actualizar nombre: $e');
+      // Revertir en UI si falla
+      _nameController.text = _petName;
     }
   }
 

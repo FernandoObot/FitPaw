@@ -224,6 +224,10 @@ public class ExerciseService {
                 System.out.println("🐟 ¡Los 4 ejercicios completados! Otorgando 2 Peces...");
                 streakRewardService.otorgarAlimento(conn, usuarioId, "Pez", 2);
             }
+
+            // 4. Verificar desbloqueo de atuendos a los 30 días
+            System.out.println("🎽 Verificando hito de 30 días...");
+            streakRewardService.verificarDesbloqueoAtuendos30Dias(conn, usuarioId);
             
             System.out.println("=== FIN DE RECOMPENSAS ===\n");
 

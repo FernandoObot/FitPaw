@@ -276,4 +276,62 @@ public class StreakRewardService {
                 return 0;
         }
     }
+
+    /**
+     * Verifica si se alcanzó racha de 30 días y desbloquea atuendos
+     */
+    public void verificarDesbloqueoAtuendos30Dias(Connection conn, int usuarioId) throws SQLException {
+        String sqlObtenerRacha = "SELECT cantidad_dias FROM public.usuarios_racha WHERE usuario_id = ? ORDER BY racha_id DESC LIMIT 1";
+        
+        try (PreparedStatement ps = conn.prepareStatement(sqlObtenerRacha)) {
+            ps.setInt(1, usuarioId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int diasRacha = rs.getInt("cantidad_dias");
+                    
+                    if (diasRacha == 30) {
+                        System.out.println("🎉 ¡Racha de 30 días alcanzada para usuario " + usuarioId + "!");
+                        int mascotaId = obtenerMascotaId(conn, usuarioId);
+                        if (mascotaId > 0) {
+                            crearAtuendosDesbloqueados(conn, mascotaId);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Crea los 2 atuendos desbloqueados a los 30 días
+     */
+    private void crearAtuendosDesbloqueados(Connection conn, int mascotaId) throws SQLException {
+        String[] atuendos = {"Ropa deportiva verde", "Ropa deportiva morada"};
+        
+        for (String atuendo : atuendos) {
+            // Verificar si ya existe
+            String checkSql = "SELECT ropa_id FROM public.mascota_ropa WHERE mascota_id = ? AND nombre_ropa = ?";
+            boolean existe = false;
+            
+            try (PreparedStatement psCheck = conn.prepareStatement(checkSql)) {
+                psCheck.setInt(1, mascotaId);
+                psCheck.setString(2, atuendo);
+                try (ResultSet rs = psCheck.executeQuery()) {
+                    existe = rs.next();
+                }
+            }
+            
+            if (!existe) {
+                String insertSql = "INSERT INTO public.mascota_ropa (mascota_id, nombre_ropa, esta_equipado) VALUES (?, ?, ?)";
+                try (PreparedStatement psInsert = conn.prepareStatement(insertSql)) {
+                    psInsert.setInt(1, mascotaId);
+                    psInsert.setString(2, atuendo);
+                    psInsert.setBoolean(3, false); // No equipado por defecto
+                    int inserted = psInsert.executeUpdate();
+                    System.out.println("✅ Atuendo creado: " + atuendo + " para mascota " + mascotaId + " (rows: " + inserted + ")");
+                }
+            } else {
+                System.out.println("⚠️ Atuendo ya existe: " + atuendo);
+            }
+        }
+    }
 }
