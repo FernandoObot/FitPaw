@@ -250,4 +250,29 @@ class ApiClient {
       throw Exception('Error al actualizar nombre de mascota: ${response.statusCode}');
     }
   }
+
+  /// Obtiene la ropa desbloqueada de la mascota
+  Future<List<Map<String, dynamic>>> getPetClothing() async {
+    final response = await get('/pet/clothing', needsAuth: true);
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
+      return data.cast<Map<String, dynamic>>();
+    } else {
+      throw Exception('Error al obtener ropa: ${response.statusCode}');
+    }
+  }
+
+  /// Actualiza el estado de equipado de una prenda
+  Future<Map<String, dynamic>> updateClothingEquipped(int ropaId, bool estaEquipado) async {
+    final response = await post(
+      '/pet/clothing/equip',
+      body: {'ropaId': ropaId, 'estaEquipado': estaEquipado},
+      needsAuth: true,
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Error al actualizar ropa: ${response.statusCode}');
+    }
+  }
 }

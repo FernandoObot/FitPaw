@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -71,7 +72,46 @@ public class PetService {
         if (points <= 0) throw new IllegalArgumentException("Item desconocido");
 
         try (Connection conn = conexionDB.conectar()) {
-            // read current
+            // Obtener mascota_id
+            String selectMascota = "SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ? FOR UPDATE";
+            int mascotaId = -1;
+            try (PreparedStatement ps = conn.prepareStatement(selectMascota)) {
+                ps.setInt(1, usuarioId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        mascotaId = rs.getInt("mascota_id");
+                    } else {
+                        throw new IllegalStateException("Mascota no encontrada para el usuario");
+                    }
+                }
+            }
+
+            // Verificar que hay cantidad del alimento disponible
+            String checkFood = "SELECT cantidad FROM public.mascota_alimento WHERE mascota_id = ? AND LOWER(nombre_comida) = LOWER(?) FOR UPDATE";
+            int foodQuantity = 0;
+            try (PreparedStatement ps = conn.prepareStatement(checkFood)) {
+                ps.setInt(1, mascotaId);
+                ps.setString(2, request.getItem());
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        foodQuantity = rs.getInt("cantidad");
+                    }
+                }
+            }
+
+            if (foodQuantity <= 0) {
+                throw new IllegalArgumentException("No hay cantidad suficiente de este alimento");
+            }
+
+            // Disminuir la cantidad de alimento en 1
+            String decreaseFood = "UPDATE public.mascota_alimento SET cantidad = cantidad - 1 WHERE mascota_id = ? AND LOWER(nombre_comida) = LOWER(?)";
+            try (PreparedStatement ps = conn.prepareStatement(decreaseFood)) {
+                ps.setInt(1, mascotaId);
+                ps.setString(2, request.getItem());
+                ps.executeUpdate();
+            }
+
+            // Actualizar hambre de la mascota
             String select = "SELECT hambre, ultima_vez_alimentado FROM public.mascota_estado WHERE usuario_id = ? FOR UPDATE";
             try (PreparedStatement ps = conn.prepareStatement(select)) {
                 ps.setInt(1, usuarioId);
@@ -143,7 +183,7 @@ public class PetService {
         k = k.replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u').replace('ñ','n');
         if (k.equals("krill") || k.equals("camaron") || k.equals("shrimp")) return 5;
         if (k.equals("pez") || k.equals("fish")) return 10;
-        if (k.equals("calamar") || k.equals("squid")) return 25;
+        if (k.equals("calamar") || k.equals("squid")) return 50;
         if (k.equals("coctel") || k.equals("cocktail")) return 50;
         return 0;
     }
@@ -240,6 +280,77 @@ public class PetService {
             return getPetStatus(usuarioId);
         } catch (SQLException e) {
             throw new IllegalStateException("Error al actualizar hambre de mascota: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Obtiene la ropa desbloqueada para la mascota del usuario
+     */
+    public java.util.List<Map<String, Object>> getPetClothing(int usuarioId) {
+        try (Connection conn = conexionDB.conectar()) {
+            // Obtener mascota_id
+            String sqlMascota = "SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ? LIMIT 1";
+            int mascotaId = -1;
+            try (PreparedStatement ps = conn.prepareStatement(sqlMascota)) {
+                ps.setInt(1, usuarioId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        mascotaId = rs.getInt("mascota_id");
+                    }
+                }
+            }
+
+            java.util.List<Map<String, Object>> clothing = new java.util.ArrayList<>();
+            
+            if (mascotaId > 0) {
+                String sqlClothing = "SELECT ropa_id, nombre_ropa, esta_equipado FROM public.mascota_ropa WHERE mascota_id = ? ORDER BY ropa_id";
+                try (PreparedStatement ps = conn.prepareStatement(sqlClothing)) {
+                    ps.setInt(1, mascotaId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            Map<String, Object> item = new java.util.HashMap<>();
+                            item.put("ropaId", rs.getInt("ropa_id"));
+                            item.put("nombreRopa", rs.getString("nombre_ropa"));
+                            item.put("estaEquipado", rs.getBoolean("esta_equipado"));
+                            clothing.add(item);
+                        }
+                    }
+                }
+            }
+            return clothing;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al obtener ropa: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Actualiza el estado de equipado para una prenda de ropa
+     */
+    public void updateClothingEquipped(int usuarioId, int ropaId, boolean estaEquipado) {
+        try (Connection conn = conexionDB.conectar()) {
+            // Primero, si se está equipando, desequipar todas las demás
+            if (estaEquipado) {
+                String desequiparSql = "UPDATE public.mascota_ropa SET esta_equipado = false WHERE ropa_id != ? AND mascota_id = (SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ?)";
+                try (PreparedStatement ps = conn.prepareStatement(desequiparSql)) {
+                    ps.setInt(1, ropaId);
+                    ps.setInt(2, usuarioId);
+                    ps.executeUpdate();
+                }
+            }
+
+            // Actualizar la ropa especificada
+            String updateSql = "UPDATE public.mascota_ropa SET esta_equipado = ? WHERE ropa_id = ? AND mascota_id = (SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ?)";
+            try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
+                ps.setBoolean(1, estaEquipado);
+                ps.setInt(2, ropaId);
+                ps.setInt(3, usuarioId);
+                int updated = ps.executeUpdate();
+                if (updated == 0) {
+                    throw new IllegalStateException("Ropa no encontrada para el usuario");
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al actualizar ropa: " + e.getMessage());
         }
     }
 }

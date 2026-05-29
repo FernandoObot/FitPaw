@@ -72,4 +72,25 @@ public class PetController {
         PetStatusResponse resp = petService.setHungerLevel(usuarioId, newHunger);
         return ResponseEntity.ok(resp);
     }
+
+    @GetMapping("/clothing")
+    public ResponseEntity<?> getClothing() {
+        int usuarioId = getUsuarioIdFromAuth();
+        java.util.List<java.util.Map<String, Object>> clothing = petService.getPetClothing(usuarioId);
+        return ResponseEntity.ok(clothing);
+    }
+
+    @PostMapping("/clothing/equip")
+    public ResponseEntity<?> equipClothing(@RequestBody java.util.Map<String, Object> request) {
+        int usuarioId = getUsuarioIdFromAuth();
+        Integer ropaId = ((Number) request.get("ropaId")).intValue();
+        Boolean estaEquipado = (Boolean) request.get("estaEquipado");
+        
+        if (ropaId == null || estaEquipado == null) {
+            return ResponseEntity.badRequest().body("Los campos 'ropaId' y 'estaEquipado' son obligatorios");
+        }
+        
+        petService.updateClothingEquipped(usuarioId, ropaId, estaEquipado);
+        return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Ropa actualizada"));
+    }
 }

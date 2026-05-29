@@ -367,6 +367,8 @@ public class AuthService {
         if (mascotaId > 0) {
             System.out.println("[MASCOTA] Creando comidas para mascota_id=" + mascotaId);
             crearComidassDefault(conn, mascotaId);
+            System.out.println("[MASCOTA] Creando ropa para mascota_id=" + mascotaId);
+            crearRopaDefault(conn, mascotaId);
         } else {
             throw new SQLException("mascota_id no fue generado correctamente");
         }
@@ -398,6 +400,31 @@ public class AuthService {
             }
         }
         System.out.println("✅ [COMIDAS] Todas las comidas creadas para mascota " + mascotaId);
+    }
+
+    /**
+     * Crea la prenda por defecto "vacio" para una mascota
+     * Esta representa que la mascota no tiene ropa puesta
+     * Otras prendas se agregan cuando el usuario las desbloquea
+     */
+    private void crearRopaDefault(Connection conn, int mascotaId) throws SQLException {
+        System.out.println("[ROPA] Iniciando creación para mascota " + mascotaId);
+        
+        String insertRopaSql = "INSERT INTO public.mascota_ropa (mascota_id, nombre_ropa, esta_equipado) VALUES (?, ?, ?)";
+        
+        try (PreparedStatement ps = conn.prepareStatement(insertRopaSql)) {
+            ps.setInt(1, mascotaId);
+            ps.setString(2, "vacio");
+            ps.setBoolean(3, true);  // Equipada por defecto (sin ropa)
+            int rows = ps.executeUpdate();
+            System.out.println("  ✅ [ROPA] vacio: " + rows + " filas");
+        } catch (SQLException e) {
+            System.err.println("  ❌ [ROPA] Error creando vacio: " + e.getMessage());
+            System.err.println("     SQL: " + e.getSQLState() + " | Code: " + e.getErrorCode());
+            e.printStackTrace();
+            throw e;
+        }
+        System.out.println("✅ [ROPA] Prenda vacio creada para mascota " + mascotaId);
     }
 
     /**

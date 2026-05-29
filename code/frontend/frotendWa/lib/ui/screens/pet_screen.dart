@@ -61,6 +61,7 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
   // Datos de la mascota desde el backend
   Map<String, dynamic>? _petStatus;
   List<Map<String, dynamic>> _foodInventory = [];
+  List<Map<String, dynamic>> _petClothing = [];
   bool _isLoadingPet = true;
   String _loadErrorMessage = '';
   
@@ -121,21 +122,36 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
     try {
       setState(() => _isLoadingPet = true);
       
-      // Cargar estado de mascota y comidas en paralelo
+      // Cargar estado de mascota, comidas y ropa en paralelo
       final petStatus = await ApiClient().getPetStatus();
       final foods = await ApiClient().getPetFoods();
+      final clothing = await ApiClient().getPetClothing();
       
       setState(() {
         _petStatus = petStatus;
         _foodInventory = foods;
+        _petClothing = clothing;
         _petName = petStatus['nombre'] ?? 'Pingui';
         _nameController.text = _petName;
         _isLoadingPet = false;
         _loadErrorMessage = '';
+        
+        // Obtener la ropa que está equipada actualmente
+        final equipadaIndex = _petClothing.indexWhere((r) => r['estaEquipado'] == true);
+        if (equipadaIndex >= 0) {
+          final nombreEquipado = (_petClothing[equipadaIndex]['nombreRopa'] as String?)?.toLowerCase() ?? '';
+          // Si la equipada es "vacio", significa que la mascota no tiene ropa
+          if (nombreEquipado == 'vacio') {
+            _appliedConjunto = null;
+          } else {
+            _appliedConjunto = equipadaIndex;
+          }
+        }
       });
       
       debugPrint('✅ Datos de mascota cargados: ${_petName}, hambre=${_foodLevel.toInt()}');
       debugPrint('🍽️ Comidas cargadas: ${_foodInventory.length} tipos');
+      debugPrint('👕 Ropa cargada: ${_petClothing.length} prendas');
       
       _updatePenguinByLevel();
       
@@ -336,26 +352,50 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
       builder: (context) {
             return _ClosetSheet(
           scale: Responsive.scale(context),
+          petClothing: _petClothing,
           appliedConjunto: _appliedConjunto,
-          onApply: (index) {
-            // allow applying conjunto 0 or 1
-            setState(() {
-              _appliedConjunto = index;
-              if (index == 0) {
-                _penguinAsset = _conjunto1Base;
-              } else if (index == 1) {
-                _penguinAsset = _conjunto2Base;
+          onApply: (index) async {
+            // Obtener el ID de la ropa
+            if (index < _petClothing.length) {
+              final ropaId = _petClothing[index]['ropaId'] as int;
+              try {
+                await ApiClient().updateClothingEquipped(ropaId, true);
+                setState(() {
+                  _appliedConjunto = index;
+                  // Actualizar visualmente según el nombre de la ropa
+                  final nombreRopa = (_petClothing[index]['nombreRopa'] as String).toLowerCase();
+                  if (nombreRopa.contains('conjunto 1') || nombreRopa.contains('paw celeste')) {
+                    _penguinAsset = _conjunto1Base;
+                  } else if (nombreRopa.contains('conjunto 2') || nombreRopa.contains('paw rosa')) {
+                    _penguinAsset = _conjunto2Base;
+                  }
+                });
+                _updatePenguinByLevel();
+                debugPrint('✅ Ropa equipada: ${_petClothing[index]['nombreRopa']}');
+              } catch (e) {
+                debugPrint('❌ Error equipando ropa: $e');
+                _statusMessage = 'Error al equipar ropa';
               }
-            });
-            _updatePenguinByLevel();
+            }
           },
-          onRemove: (index) {
-            // remove any applied outfit
-            setState(() {
-              _appliedConjunto = null;
-              _penguinAsset = _defaultHappy;
-            });
-            _updatePenguinByLevel();
+          onRemove: (index) async {
+            // Al remover ropa, equipar la prenda "vacio" (sin ropa)
+            final vacioIndex = _petClothing.indexWhere((r) => (r['nombreRopa'] as String?)?.toLowerCase() == 'vacio');
+            if (vacioIndex >= 0) {
+              final ropaId = _petClothing[vacioIndex]['ropaId'] as int;
+              try {
+                await ApiClient().updateClothingEquipped(ropaId, true);
+                setState(() {
+                  _appliedConjunto = null;
+                  _penguinAsset = _defaultHappy;
+                });
+                _updatePenguinByLevel();
+                debugPrint('✅ Ropa removida - equipada prenda vacio');
+              } catch (e) {
+                debugPrint('❌ Error removiendo ropa: $e');
+                _statusMessage = 'Error al remover ropa';
+              }
+            }
           },
         );
       },
@@ -924,11 +964,13 @@ class _ClosetSheet extends StatefulWidget {
   const _ClosetSheet({
     required this.scale,
     required this.appliedConjunto,
+    required this.petClothing,
     this.onApply,
     this.onRemove,
   });
 
   final double scale;
+  final List<Map<String, dynamic>> petClothing;
   // currently applied conjunto index (null = none)
   final int? appliedConjunto;
   final void Function(int)? onApply;
@@ -939,7 +981,6 @@ class _ClosetSheet extends StatefulWidget {
 }
 
 class _ClosetSheetState extends State<_ClosetSheet> {
-  int? _lockedMessageIndex;
   int? _appliedConjunto;
   // conjunto actualmente seleccionado en el modal (null = ninguno)
   int? _selectedIndex;
@@ -950,28 +991,31 @@ class _ClosetSheetState extends State<_ClosetSheet> {
     _appliedConjunto = widget.appliedConjunto;
   }
 
-  void _handleLockedTap(int index) {
-    setState(() => _lockedMessageIndex = index);
-  }
-
   void _handleSelect(int index) {
     setState(() {
       _selectedIndex = index;
-      // clear any locked message when selecting an unlocked tile
-      _lockedMessageIndex = null;
     });
+  }
+
+  String _getClothingImagePath(String nombreRopa) {
+    final lower = nombreRopa.toLowerCase();
+    if (lower.contains('conjunto 1') || lower.contains('celeste')) {
+      return 'assets/images/conjunto 1 base.png';
+    } else if (lower.contains('conjunto 2') || lower.contains('rosa')) {
+      return 'assets/images/conjunto 2.png';
+    } else if (lower.contains('conjunto 3')) {
+      return 'assets/images/conjunto 3.png';
+    } else if (lower.contains('conjunto 4') || lower.contains('pirata')) {
+      return 'assets/images/conjunto 4.png';
+    } else if (lower.contains('conjunto 5') || lower.contains('lentes')) {
+      return 'assets/images/conjunto 5.png';
+    }
+    return 'assets/images/conjunto 1 base.png';
   }
 
   @override
   Widget build(BuildContext context) {
     final double scale = widget.scale;
-    const List<String> outfitImages = [
-      'assets/images/conjunto 1 base.png',
-      'assets/images/conjunto 2.png',
-      'assets/images/conjunto 3.png',
-      'assets/images/conjunto 4.png',
-      'assets/images/conjunto 5.png',
-    ];
 
     return SafeArea(
       child: LayoutBuilder(
@@ -1013,7 +1057,7 @@ class _ClosetSheetState extends State<_ClosetSheet> {
                   ),
                   SizedBox(height: 4 * scale),
                   Text(
-                    'Selecciona un conjunto (5 espacios).',
+                    'Selecciona una prenda.',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: Responsive.fs(context, 12),
@@ -1021,124 +1065,134 @@ class _ClosetSheetState extends State<_ClosetSheet> {
                     ),
                   ),
                   SizedBox(height: 16 * scale),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: 5,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 12 * scale,
-                      crossAxisSpacing: 12 * scale,
-                      childAspectRatio: 1,
-                    ),
-                    itemBuilder: (context, index) {
-                      // unlock only the first two conjuntos (0 and 1)
-                      final bool isLocked = index > 1;
-                      final String imagePath = outfitImages[index];
+                  // Filtrar prendas: excluir "vacio"
+                  Builder(
+                    builder: (context) {
+                      final prendasDisponibles = widget.petClothing
+                          .where((ropa) => (ropa['nombreRopa'] as String?)?.toLowerCase() != 'vacio')
+                          .toList();
+                      
+                      if (prendasDisponibles.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24 * scale),
+                            child: Text(
+                              'No hay prendas desbloqueadas',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: Responsive.fs(context, 14),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        );
+                      }
 
-                      return InkWell(
-                        borderRadius: BorderRadius.circular(16 * scale),
-                        onTap: isLocked
-                            ? () => _handleLockedTap(index)
-                            : () => _handleSelect(index),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16 * scale),
-                          child: Stack(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: AppColors.fieldBackground.withValues(alpha: 0.8),
-                                  borderRadius: BorderRadius.circular(16 * scale),
-                                    border: Border.all(
-                                    color: index == _appliedConjunto
-                                        ? AppColors.mintPrimary
-                                        : AppColors.blueSecondary.withValues(alpha: 0.4),
-                                    width: 1 * scale,
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: prendasDisponibles.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12 * scale,
+                          crossAxisSpacing: 12 * scale,
+                          childAspectRatio: 1,
+                        ),
+                        itemBuilder: (context, index) {
+                          final clothingItem = prendasDisponibles[index];
+                          final String nombreRopa = (clothingItem['nombreRopa'] as String?) ?? 'Conjunto ${index + 1}';
+                          
+                          // Mapear nombre de ropa a imagen
+                          final String imagePath = _getClothingImagePath(nombreRopa);
+                          
+                          // Obtener el índice original en la lista completa
+                          final originalIndex = widget.petClothing.indexOf(clothingItem);
+
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(16 * scale),
+                            onTap: () => _handleSelect(originalIndex),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16 * scale),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: AppColors.fieldBackground.withValues(alpha: 0.8),
+                                      borderRadius: BorderRadius.circular(16 * scale),
+                                      border: Border.all(
+                                        color: originalIndex == _appliedConjunto
+                                            ? AppColors.mintPrimary
+                                            : AppColors.blueSecondary.withValues(alpha: 0.4),
+                                        width: 1 * scale,
+                                      ),
+                                    ),
+                                    child: imagePath.isNotEmpty
+                                        ? SizedBox.expand(
+                                            child: Image.asset(
+                                              imagePath,
+                                              fit: BoxFit.cover,
+                                              alignment: Alignment.center,
+                                            ),
+                                          )
+                                        : Center(
+                                            child: Text(
+                                              nombreRopa,
+                                              style: TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: Responsive.fs(context, 12),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
                                   ),
-                                ),
-                                child: imagePath.isNotEmpty
-                                    ? SizedBox.expand(
-                                        child: Image.asset(
-                                          imagePath,
-                                          fit: BoxFit.cover,
-                                          alignment: Alignment.center,
-                                        ),
-                                      )
-                                    : Center(
-                                        child: Text(
-                                          'Conjunto ${index + 1}',
-                                          style: TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: Responsive.fs(context, 12),
-                                            fontWeight: FontWeight.w600,
+                                  // Mostrar botón Aplicar/Quitar dentro del cuadro si está seleccionado
+                                  if (_selectedIndex == originalIndex)
+                                    Positioned(
+                                      left: 8 * scale,
+                                      right: 8 * scale,
+                                      bottom: 8 * scale,
+                                      child: SizedBox(
+                                        height: 36 * scale,
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              if (_appliedConjunto == originalIndex) {
+                                                _appliedConjunto = null;
+                                                widget.onRemove?.call(originalIndex);
+                                                return;
+                                              }
+                                              _appliedConjunto = originalIndex;
+                                              widget.onApply?.call(originalIndex);
+                                            });
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: _appliedConjunto == originalIndex
+                                                ? Colors.white
+                                                : AppColors.mintPrimary,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12 * scale),
+                                            ),
+                                            elevation: 2 * scale,
+                                          ),
+                                          child: Text(
+                                            _appliedConjunto == originalIndex ? 'Quitar' : 'Aplicar',
+                                            style: TextStyle(
+                                              color: _appliedConjunto == originalIndex ? AppColors.textPrimary : Colors.white,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
                                         ),
                                       ),
+                                    ),
+                                ],
                               ),
-                              if (isLocked)
-                                Container(
-                                  color: Colors.white.withValues(alpha: 0.55),
-                                ),
-                              if (isLocked && _lockedMessageIndex == index)
-                                Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(12 * scale),
-                                    child: Text(
-                                      'Obten esta recompensa realizando tus metas',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: AppColors.textPrimary,
-                                        fontSize: Responsive.fs(context, 11),
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              // Mostrar botón Aplicar/Quitar dentro del cuadro si está seleccionado y desbloqueado
-                              if (!isLocked && _selectedIndex == index)
-                                Positioned(
-                                  left: 8 * scale,
-                                  right: 8 * scale,
-                                  bottom: 8 * scale,
-                                  child: SizedBox(
-                                    height: 36 * scale,
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          if (_appliedConjunto == index) {
-                                            _appliedConjunto = null;
-                                            widget.onRemove?.call(index);
-                                            return;
-                                          }
-                                          _appliedConjunto = index;
-                                          widget.onApply?.call(index);
-                                        });
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: _appliedConjunto == index
-                                            ? Colors.white
-                                            : AppColors.mintPrimary,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12 * scale),
-                                        ),
-                                        elevation: 2 * scale,
-                                      ),
-                                      child: Text(
-                                        _appliedConjunto == index ? 'Quitar' : 'Aplicar',
-                                        style: TextStyle(
-                                          color: _appliedConjunto == index ? AppColors.textPrimary : Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
+
                   SizedBox(height: 8 * scale),
                   Align(
                     alignment: Alignment.centerRight,

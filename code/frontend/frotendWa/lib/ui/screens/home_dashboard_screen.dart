@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 
 import '../../core/app_colors.dart';
 import '../widgets/responsive.dart';
@@ -8,7 +9,6 @@ import 'activity_history_screen.dart';
 import 'camera_screen.dart';
 import 'pet_screen.dart';
 import 'profile_screen.dart';
-import 'streak_days_screen.dart';
 import 'training_schedule_screen.dart';
 import 'exercise_detail_screen.dart';
 import 'running_screen.dart';
@@ -32,6 +32,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
   int _selectedTaskIndex = 0;
   int _pressedTaskIndex = -1;
   bool _isReviewPressed = false;
+  int _diasRacha = 0;
+  bool _loadingRacha = true;
 
   @override
   void initState() {
@@ -42,6 +44,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
       duration: const Duration(milliseconds: 1250),
     )..repeat(reverse: true);
     _loadProfileName();
+    _loadRachaData();
   }
 
   @override
@@ -88,6 +91,37 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
       debugPrint('❌ Excepción en _loadProfileName: $e');
       if (mounted) {
         setState(() => _loadingProfileName = false);
+      }
+    }
+  }
+
+  Future<void> _loadRachaData() async {
+    debugPrint('🔥 Cargando datos de racha...');
+    try {
+      final response = await ApiClient().get('/streak/info', needsAuth: true);
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _diasRacha = data['conteoDias'] ?? 0;
+          _loadingRacha = false;
+          debugPrint('✅ Racha cargada: $_diasRacha días');
+        });
+      } else {
+        setState(() {
+          _diasRacha = 0;
+          _loadingRacha = false;
+          debugPrint('⚠️ Error al cargar racha: ${response.statusCode}');
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _diasRacha = 0;
+          _loadingRacha = false;
+          debugPrint('❌ Error cargando racha: $e');
+        });
       }
     }
   }
@@ -143,93 +177,82 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                           ],
                         ),
                         SizedBox(height: 18 * scale),
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
+                        Container(
+                          height: 160 * scale,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.primaryGradient,
                             borderRadius: BorderRadius.circular(24 * scale),
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => const StreakDaysScreen()),
-                              );
-                            },
-                            child: Container(
-                              height: 160 * scale,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                gradient: AppColors.primaryGradient,
-                                borderRadius: BorderRadius.circular(24 * scale),
-                                image: const DecorationImage(
-                                  image: AssetImage('assets/images/Banner-Dots.png'),
-                                  fit: BoxFit.cover,
+                            image: const DecorationImage(
+                              image: AssetImage('assets/images/Banner-Dots.png'),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 18 * scale, vertical: 16 * scale),
+                          child: Row(
+                            children: [
+                              AnimatedBuilder(
+                                animation: _streakController,
+                                builder: (context, child) {
+                                  final double pulse = 1 + (_streakController.value * 0.12);
+                                  return Transform.scale(
+                                    scale: pulse,
+                                    child: Container(
+                                      width: 58 * scale,
+                                      height: 58 * scale,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.white.withValues(alpha: 0.12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.white.withValues(alpha: 0.30 * _streakController.value),
+                                            blurRadius: 22 * scale,
+                                            spreadRadius: 2 * scale,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Icon(
+                                        Icons.local_fire_department_outlined,
+                                        color: Colors.white,
+                                        size: 40 * scale,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              SizedBox(width: 14 * scale),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _loadingRacha ? '-' : '$_diasRacha',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: Responsive.fs(context, 56),
+                                        fontWeight: FontWeight.w700,
+                                        height: 0.95,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2 * scale),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'Dias de racha',
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: Responsive.fs(context, 20),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              padding: EdgeInsets.symmetric(horizontal: 18 * scale, vertical: 16 * scale),
-                              child: Row(
-                                children: [
-                                  AnimatedBuilder(
-                                    animation: _streakController,
-                                    builder: (context, child) {
-                                      final double pulse = 1 + (_streakController.value * 0.12);
-                                      return Transform.scale(
-                                        scale: pulse,
-                                        child: Container(
-                                          width: 58 * scale,
-                                          height: 58 * scale,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Colors.white.withValues(alpha: 0.12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.white.withValues(alpha: 0.30 * _streakController.value),
-                                                blurRadius: 22 * scale,
-                                                spreadRadius: 2 * scale,
-                                              ),
-                                            ],
-                                          ),
-                                          child: Icon(
-                                            Icons.local_fire_department_outlined,
-                                            color: Colors.white,
-                                            size: 40 * scale,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  SizedBox(width: 14 * scale),
-                                  Expanded(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '15',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: Responsive.fs(context, 56),
-                                            fontWeight: FontWeight.w700,
-                                            height: 0.95,
-                                          ),
-                                        ),
-                                        SizedBox(height: 2 * scale),
-                                        FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          alignment: Alignment.centerLeft,
-                                          child: Text(
-                                            'Dias de racha',
-                                            maxLines: 1,
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: Responsive.fs(context, 20),
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                            ],
                           ),
                         ),
                         SizedBox(height: 18 * scale),
