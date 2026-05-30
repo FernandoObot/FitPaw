@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-
 import '../../core/app_colors.dart';
 import '../widgets/responsive.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_client.dart';
+import '../../services/racha_service.dart';
 import 'activity_history_screen.dart';
 import 'camera_screen.dart';
 import 'pet_screen.dart';
@@ -98,23 +97,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
   Future<void> _loadRachaData() async {
     debugPrint('🔥 Cargando datos de racha...');
     try {
-      final response = await ApiClient().get('/streak/info', needsAuth: true);
+      final diasRacha = await RachaService().obtenerDiasRacha();
       if (!mounted) return;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        setState(() {
-          _diasRacha = data['conteoDias'] ?? 0;
-          _loadingRacha = false;
-          debugPrint('✅ Racha cargada: $_diasRacha días');
-        });
-      } else {
-        setState(() {
-          _diasRacha = 0;
-          _loadingRacha = false;
-          debugPrint('⚠️ Error al cargar racha: ${response.statusCode}');
-        });
-      }
+      setState(() {
+        _diasRacha = diasRacha;
+        _loadingRacha = false;
+        debugPrint('✅ Racha cargada: $_diasRacha días');
+      });
     } catch (e) {
       if (mounted) {
         setState(() {

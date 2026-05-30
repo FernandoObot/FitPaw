@@ -20,12 +20,14 @@ import com.fitpaw.backend.repository.ConexionDB;
 public class PetService {
 
     private final ConexionDB conexionDB;
+    private final StreakRewardService streakRewardService;
 
     @Value("${pet.hunger.decrease-ms-per-point:600000}")
     private long decreaseMsPerPoint; // default 10 minutes per 1 hunger point
 
-    public PetService(ConexionDB conexionDB) {
+    public PetService(ConexionDB conexionDB, StreakRewardService streakRewardService) {
         this.conexionDB = conexionDB;
+        this.streakRewardService = streakRewardService;
     }
 
     public PetStatusResponse getPetStatus(int usuarioId) {
@@ -303,15 +305,17 @@ public class PetService {
             java.util.List<Map<String, Object>> clothing = new java.util.ArrayList<>();
             
             if (mascotaId > 0) {
+                streakRewardService.verificarDesbloqueoAtuendos30Dias(conn, usuarioId);
+
                 String sqlClothing = "SELECT ropa_id, nombre_ropa, esta_equipado FROM public.mascota_ropa WHERE mascota_id = ? ORDER BY ropa_id";
                 try (PreparedStatement ps = conn.prepareStatement(sqlClothing)) {
                     ps.setInt(1, mascotaId);
                     try (ResultSet rs = ps.executeQuery()) {
                         while (rs.next()) {
                             Map<String, Object> item = new java.util.HashMap<>();
-                            item.put("ropaId", rs.getInt("ropa_id"));
-                            item.put("nombreRopa", rs.getString("nombre_ropa"));
-                            item.put("estaEquipado", rs.getBoolean("esta_equipado"));
+                            item.put("ropa_id", rs.getInt("ropa_id"));
+                            item.put("nombre_ropa", rs.getString("nombre_ropa"));
+                            item.put("esta_equipado", rs.getBoolean("esta_equipado"));
                             clothing.add(item);
                         }
                     }

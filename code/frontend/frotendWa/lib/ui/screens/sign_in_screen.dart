@@ -104,9 +104,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     icon: Icons.lock_outline_rounded,
                     obscure: true,
                   ),
-                  SizedBox(height: 10 * scale),
-                  Text('Olvidaste tu contrasena?', style: TextStyle(fontSize: Responsive.fs(context, 12), color: AppColors.textSecondary, decoration: TextDecoration.underline)),
-                  const Spacer(),
+                  
                   SizedBox(
                     width: double.infinity,
                     height: 56 * scale,
@@ -154,7 +152,7 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 }
 
-class _LoginField extends StatelessWidget {
+class _LoginField extends StatefulWidget {
   const _LoginField({
     required this.hint,
     required this.icon,
@@ -168,15 +166,38 @@ class _LoginField extends StatelessWidget {
   final TextEditingController? controller;
 
   @override
+  State<_LoginField> createState() => _LoginFieldState();
+}
+
+class _LoginFieldState extends State<_LoginField> {
+  late bool _hideText;
+
+  @override
+  void initState() {
+    super.initState();
+    _hideText = widget.obscure;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: controller,
-      obscureText: obscure,
+      controller: widget.controller,
+      obscureText: widget.obscure && _hideText,
       decoration: InputDecoration(
-        hintText: hint,
+        hintText: widget.hint,
         hintStyle: TextStyle(color: AppColors.faintText, fontSize: Responsive.fs(context, 13)),
-        prefixIcon: Icon(icon, color: AppColors.faintText, size: 20),
-        suffixIcon: obscure ? const Icon(Icons.visibility_off_outlined, color: AppColors.faintText, size: 20) : null,
+        prefixIcon: Icon(widget.icon, color: AppColors.faintText, size: 20),
+        suffixIcon: widget.obscure
+            ? IconButton(
+                tooltip: _hideText ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                onPressed: () => setState(() => _hideText = !_hideText),
+                icon: Icon(
+                  _hideText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: AppColors.faintText,
+                  size: 20,
+                ),
+              )
+            : null,
       ),
     );
   }

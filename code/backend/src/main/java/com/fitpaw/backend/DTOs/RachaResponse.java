@@ -1,5 +1,6 @@
 package com.fitpaw.backend.DTOs;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDate;
 
 public class RachaResponse {
@@ -34,6 +35,11 @@ public class RachaResponse {
 
     public void setUsuarioId(int usuarioId) {
         this.usuarioId = usuarioId;
+    }
+
+    @JsonProperty("cantidad_dias")
+    public int getCantidadDias() {
+        return conteoDias;
     }
 
     public int getConteoDias() {

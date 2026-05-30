@@ -30,6 +30,9 @@ import com.fitpaw.backend.util.JwtUtil;
 public class AuthService {
 
     private static final Pattern PHONE_10_DIGITS = Pattern.compile("^\\d{10}$");
+    private static final Pattern USERNAME = Pattern.compile("^[A-Za-zÁÉÍÓÚáéíóúÑñ]{1,16}$");
+    private static final Pattern PASSWORD_LETTER = Pattern.compile(".*[A-Za-z].*");
+    private static final Pattern PASSWORD_NUMBER = Pattern.compile(".*\\d.*");
 
     private final ConexionDB conexionDB;
     private final BCryptPasswordEncoder passwordEncoder;
@@ -63,8 +66,18 @@ public class AuthService {
             throw new IllegalArgumentException("Todos los campos son obligatorios");
         }
 
+        if (!USERNAME.matcher(nombreCompleto).matches()) {
+            throw new IllegalArgumentException("El nombre de usuario debe tener maximo 16 letras y no puede incluir numeros ni simbolos");
+        }
+
         if (!PHONE_10_DIGITS.matcher(telefono).matches()) {
             throw new IllegalArgumentException("El telefono debe tener exactamente 10 digitos");
+        }
+
+        if (password.length() < 8
+                || !PASSWORD_LETTER.matcher(password).matches()
+                || !PASSWORD_NUMBER.matcher(password).matches()) {
+            throw new IllegalArgumentException("La contrasena debe tener minimo 8 caracteres, una letra y un numero");
         }
 
         try (Connection conn = conexionDB.conectar()) {

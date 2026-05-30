@@ -22,12 +22,10 @@ import com.fitpaw.backend.repository.ConexionDB;
 public class StreakService {
 
     private final ConexionDB conexionDB;
-    private final MascotaLogrosService mascotaLogrosService;
     private static final int DIAS_MINIMOS_RACHA = 3;
 
-    public StreakService(ConexionDB conexionDB, MascotaLogrosService mascotaLogrosService) {
+    public StreakService(ConexionDB conexionDB) {
         this.conexionDB = conexionDB;
-        this.mascotaLogrosService = mascotaLogrosService;
     }
 
     /**
@@ -38,8 +36,8 @@ public class StreakService {
         try (Connection conn = conexionDB.conectar()) {
             validarUsuarioExiste(conn, usuarioId);
 
-            String sql = "SELECT racha_id, usuario_id, conteo_dias, ultima_fecha_actividad "
-                    + "FROM public.progreso_rachas WHERE usuario_id = ?";
+            String sql = "SELECT racha_id, usuario_id, cantidad_dias, fecha_ultima_actividad "
+                    + "FROM public.usuarios_racha WHERE usuario_id = ? ORDER BY racha_id DESC LIMIT 1";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, usuarioId);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -131,14 +129,27 @@ public class StreakService {
                 return respuesta;
             }
 
-            // Generar recompensas según el conteo de días
-            generarRecompensasSegunConteo(conn, usuarioId, recompensas, racha.getConteoDias());
-            
-            // Otorgar recompensas al inventario
-            otorgarRecompensas(conn, usuarioId, recompensas);
+            // Otorgar recompensas de comida basadas en el conteo
+            if (racha.getConteoDias() > 0) {
+                // Cada día: 2 Pescados Azules
+                agregarAlimento(conn, usuarioId, "Pescado Azul", 2);
+                recompensas.add(new RecompensaItem(1, "Pescado Azul", "comida", 2, "Por cada día de racha"));
+            }
+
+            if (racha.getConteoDias() % 3 == 0 && racha.getConteoDias() > 0) {
+                // Cada 3 días: 1 Calamar
+                agregarAlimento(conn, usuarioId, "Calamar", 1);
+                recompensas.add(new RecompensaItem(2, "Calamar", "comida", 1, "Cada 3 días"));
+            }
+
+            if (racha.getConteoDias() % 15 == 0 && racha.getConteoDias() > 0) {
+                // Cada 15 días: 1 Cóctel
+                agregarAlimento(conn, usuarioId, "Cóctel", 1);
+                recompensas.add(new RecompensaItem(3, "Cóctel", "comida", 1, "Cada 15 días"));
+            }
             
             respuesta.setRecompensas(recompensas);
-            respuesta.setEsNueva(true);
+            respuesta.setEsNueva(!recompensas.isEmpty());
             return respuesta;
         } catch (SQLException e) {
             throw new IllegalStateException("Error al calcular recompensas: " + e.getMessage());
@@ -147,160 +158,15 @@ public class StreakService {
 
     // ==================== MÉTODOS PRIVADOS ====================
 
-    private void generarRecompensasSegunConteo(Connection conn, int usuarioId, List<RecompensaItem> recompensas, int conteoDias) 
-            throws SQLException {
-        
-        // 1. Recompensa por cada día de racha activa: 2 pescados azules
-        int idPescadoAzul = obtenerIdItemPorNombre(conn, "Pescado Azul");
-        if (idPescadoAzul > 0) {
-            recompensas.add(new RecompensaItem(
-                idPescadoAzul, 
-                "Pescado Azul", 
-                "comida", 
-                2, 
-                "Por cada día de racha activa"
-            ));
-        }
-
-        // 2. Recompensa por ejercicio: 1 camarón naranja (diario)
-        int idCamaronNaranja = obtenerIdItemPorNombre(conn, "Camarón Naranja");
-        if (idCamaronNaranja > 0) {
-            recompensas.add(new RecompensaItem(
-                idCamaronNaranja,
-                "Camarón Naranja",
-                "comida",
-                1,
-                "Por completar ejercicio del día"
-            ));
-        }
-
-        // 3. Recompensa cada 3 días consecutivos: 1 calamar
-        if (conteoDias > 0 && conteoDias % 3 == 0) {
-            int idCalamar = obtenerIdItemPorNombre(conn, "Calamar");
-            if (idCalamar > 0) {
-                recompensas.add(new RecompensaItem(
-                    idCalamar,
-                    "Calamar",
-                    "comida",
-                    1,
-                    "Por cada 3 días consecutivos de racha"
-                ));
-            }
-        }
-
-        // 4. Recompensa cada 15 días consecutivos: 1 cóctel
-        if (conteoDias >= 15 && conteoDias % 15 == 0) {
-            int idCoctel = obtenerIdItemPorNombre(conn, "Cóctel");
-            if (idCoctel > 0) {
-                recompensas.add(new RecompensaItem(
-                    idCoctel,
-                    "Cóctel",
-                    "comida",
-                    1,
-                    "Por cada 15 días consecutivos de racha"
-                ));
-            }
-        }
-
-        mascotaLogrosService.agregarRecompensasPorRacha(conn, usuarioId, conteoDias, recompensas);
-    }
-
-    private void otorgarRecompensas(Connection conn, int usuarioId, List<RecompensaItem> recompensas) 
-            throws SQLException {
-        
-        for (RecompensaItem recompensa : recompensas) {
-            agregarAlInventario(conn, usuarioId, recompensa.getItemId(), recompensa.getCantidad());
-        }
-    }
-
-    private void agregarAlInventario(Connection conn, int usuarioId, int itemId, int cantidad) 
-            throws SQLException {
-        
-        // Verificar si ya existe el item en el inventario
-        String checkSql = "SELECT inventario_id, cantidad, esta_equipado FROM public.mascota_inventario "
-                + "WHERE usuario_id = ? AND item_id = ?";
-        try (PreparedStatement checkPs = conn.prepareStatement(checkSql)) {
-            checkPs.setInt(1, usuarioId);
-            checkPs.setInt(2, itemId);
-            try (ResultSet rs = checkPs.executeQuery()) {
-                boolean itemEsRopa = esItemRopa(conn, itemId);
-                if (rs.next()) {
-                    // Actualizar cantidad existente
-                    int inventarioId = rs.getInt("inventario_id");
-                    int cantidadActual = rs.getInt("cantidad");
-                    boolean equipadoActual = rs.getBoolean("esta_equipado");
-                    String updateSql = "UPDATE public.mascota_inventario SET cantidad = ?, esta_equipado = ? WHERE inventario_id = ?";
-                    try (PreparedStatement updatePs = conn.prepareStatement(updateSql)) {
-                        updatePs.setInt(1, cantidadActual + cantidad);
-                        updatePs.setBoolean(2, equipadoActual || itemEsRopa);
-                        updatePs.setInt(3, inventarioId);
-                        updatePs.executeUpdate();
-                    }
-                } else {
-                    // Insertar nuevo item
-                    String insertSql = "INSERT INTO public.mascota_inventario "
-                            + "(usuario_id, item_id, cantidad, esta_equipado) VALUES (?, ?, ?, ?)";
-                    try (PreparedStatement insertPs = conn.prepareStatement(insertSql)) {
-                        insertPs.setInt(1, usuarioId);
-                        insertPs.setInt(2, itemId);
-                        insertPs.setInt(3, cantidad);
-                        insertPs.setBoolean(4, itemEsRopa);
-                        insertPs.executeUpdate();
-                    }
-                }
-            }
-        }
-    }
-
-    private boolean esItemRopa(Connection conn, int itemId) throws SQLException {
-        String sql = "SELECT tipo, nombre FROM public.mascota_catalogo_items WHERE item_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, itemId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    String tipo = normalizar(rs.getString("tipo"));
-                    String nombre = normalizar(rs.getString("nombre"));
-                    return tipo.contains("ropa")
-                            || nombre.startsWith("conjunto ")
-                            || nombre.startsWith("traje ")
-                            || nombre.startsWith("vestido ");
-                }
-            }
-        }
-        return false;
-    }
-
-    private String normalizar(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.trim().toLowerCase()
-                .replace('á', 'a')
-                .replace('é', 'e')
-                .replace('í', 'i')
-                .replace('ó', 'o')
-                .replace('ú', 'u')
-                .replace('ñ', 'n');
-    }
-
-    private int obtenerIdItemPorNombre(Connection conn, String nombre) throws SQLException {
-        String sql = "SELECT item_id FROM public.mascota_catalogo_items WHERE nombre = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, nombre);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("item_id");
-                }
-            }
-        }
-        return -1;
-    }
-
+    /**
+     * Obtiene la última fecha con actividad del usuario (ejercicios)
+     */
     private LocalDate obtenerUltimaFechaConActividad(Connection conn, int usuarioId) throws SQLException {
-        // Buscar en progreso_bitacora_fuerza (ejercicios de fuerza)
-        String sqlFuerza = "SELECT MAX(DATE(fecha)) as ultima_fecha FROM public.progreso_bitacora_fuerza "
-                + "WHERE usuario_id = ? AND DATE(fecha) >= CURRENT_DATE - INTERVAL '1 day'";
         LocalDate ultimaFecha = null;
+
+        // Buscar en ejercicio_fuerza
+        String sqlFuerza = "SELECT MAX(fecha::date) as ultima_fecha FROM public.ejercicio_fuerza "
+                + "WHERE usuario_id = ? AND fecha >= CURRENT_DATE - INTERVAL '1 day'";
         
         try (PreparedStatement ps = conn.prepareStatement(sqlFuerza)) {
             ps.setInt(1, usuarioId);
@@ -314,21 +180,19 @@ public class StreakService {
             }
         }
 
-        // Buscar en progreso_bitacora_extra (deportes extra y correr)
-        String sqlExtra = "SELECT MAX(fecha) as ultima_fecha FROM public.progreso_bitacora_fuerza b "
-                + "JOIN public.entrenamiento_ejercicios e ON e.ejercicio_id = b.ejercicio_id "
-                + "WHERE b.usuario_id = ? AND e.nombre = 'Correr' "
-                + "AND b.fecha >= CURRENT_DATE - INTERVAL '1 day'";
+        // Buscar en ejercicio_cardio
+        String sqlCardio = "SELECT MAX(fecha::date) as ultima_fecha FROM public.ejercicio_cardio "
+                + "WHERE usuario_id = ? AND fecha >= CURRENT_DATE - INTERVAL '1 day'";
         
-        try (PreparedStatement ps = conn.prepareStatement(sqlExtra)) {
+        try (PreparedStatement ps = conn.prepareStatement(sqlCardio)) {
             ps.setInt(1, usuarioId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     java.sql.Date dbDate = rs.getDate("ultima_fecha");
                     if (dbDate != null) {
-                        LocalDate fechaCorrer = dbDate.toLocalDate();
-                        if (ultimaFecha == null || fechaCorrer.isAfter(ultimaFecha)) {
-                            ultimaFecha = fechaCorrer;
+                        LocalDate fechaCardio = dbDate.toLocalDate();
+                        if (ultimaFecha == null || fechaCardio.isAfter(ultimaFecha)) {
+                            ultimaFecha = fechaCardio;
                         }
                     }
                 }
@@ -338,9 +202,63 @@ public class StreakService {
         return ultimaFecha;
     }
 
+    /**
+     * Agrega comida al inventario (mascota_alimento)
+     */
+    private void agregarAlimento(Connection conn, int usuarioId, String nombreComida, int cantidad) throws SQLException {
+        // Obtener mascota_id del usuario
+        String sqlMascota = "SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ? LIMIT 1";
+        int mascotaId = -1;
+        
+        try (PreparedStatement ps = conn.prepareStatement(sqlMascota)) {
+            ps.setInt(1, usuarioId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    mascotaId = rs.getInt("mascota_id");
+                }
+            }
+        }
+
+        if (mascotaId <= 0) {
+            return; // Sin mascota, no agregar alimento
+        }
+
+        // Verificar si ya existe este alimento
+        String checkSql = "SELECT alimento_id, cantidad FROM public.mascota_alimento "
+                + "WHERE mascota_id = ? AND nombre_comida = ?";
+        
+        try (PreparedStatement ps = conn.prepareStatement(checkSql)) {
+            ps.setInt(1, mascotaId);
+            ps.setString(2, nombreComida);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    // Actualizar cantidad existente
+                    int alimentoId = rs.getInt("alimento_id");
+                    int cantidadActual = rs.getInt("cantidad");
+                    String updateSql = "UPDATE public.mascota_alimento SET cantidad = ? WHERE alimento_id = ?";
+                    try (PreparedStatement updatePs = conn.prepareStatement(updateSql)) {
+                        updatePs.setInt(1, cantidadActual + cantidad);
+                        updatePs.setInt(2, alimentoId);
+                        updatePs.executeUpdate();
+                    }
+                } else {
+                    // Insertar nuevo alimento
+                    String insertSql = "INSERT INTO public.mascota_alimento (mascota_id, nombre_comida, cantidad, beneficio_puntos) "
+                            + "VALUES (?, ?, ?, 0)";
+                    try (PreparedStatement insertPs = conn.prepareStatement(insertSql)) {
+                        insertPs.setInt(1, mascotaId);
+                        insertPs.setString(2, nombreComida);
+                        insertPs.setInt(3, cantidad);
+                        insertPs.executeUpdate();
+                    }
+                }
+            }
+        }
+    }
+
     private RachaResponse obtenerRachaActualOCrear(Connection conn, int usuarioId) throws SQLException {
-        String sql = "SELECT racha_id, usuario_id, conteo_dias, ultima_fecha_actividad "
-                + "FROM public.progreso_rachas WHERE usuario_id = ?";
+        String sql = "SELECT racha_id, usuario_id, cantidad_dias, fecha_ultima_actividad "
+                + "FROM public.usuarios_racha WHERE usuario_id = ? ORDER BY racha_id DESC LIMIT 1";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, usuarioId);
             try (ResultSet rs = ps.executeQuery()) {
@@ -353,8 +271,8 @@ public class StreakService {
     }
 
     private RachaResponse crearRachaInicial(Connection conn, int usuarioId) throws SQLException {
-        String sql = "INSERT INTO public.progreso_rachas (usuario_id, conteo_dias, ultima_fecha_actividad) "
-                + "VALUES (?, ?, NULL) RETURNING racha_id";
+        String sql = "INSERT INTO public.usuarios_racha (usuario_id, cantidad_dias, fecha_inicio, fecha_ultima_actividad, activa) "
+                + "VALUES (?, ?, CURRENT_DATE, NULL, false) RETURNING racha_id";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, usuarioId);
             ps.setInt(2, 0);
@@ -379,7 +297,7 @@ public class StreakService {
     private void actualizarRachaEnDB(Connection conn, int rachaId, int nuevoConteo, LocalDate ultimaFecha) 
             throws SQLException {
         
-        String sql = "UPDATE public.progreso_rachas SET conteo_dias = ?, ultima_fecha_actividad = ? "
+        String sql = "UPDATE public.usuarios_racha SET cantidad_dias = ?, fecha_ultima_actividad = ?, activa = ? "
                 + "WHERE racha_id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, nuevoConteo);
@@ -388,7 +306,8 @@ public class StreakService {
             } else {
                 ps.setNull(2, java.sql.Types.DATE);
             }
-            ps.setInt(3, rachaId);
+            ps.setBoolean(3, nuevoConteo >= DIAS_MINIMOS_RACHA);
+            ps.setInt(4, rachaId);
             ps.executeUpdate();
         }
     }
@@ -397,9 +316,9 @@ public class StreakService {
         RachaResponse racha = new RachaResponse();
         racha.setRachaId(rs.getInt("racha_id"));
         racha.setUsuarioId(rs.getInt("usuario_id"));
-        racha.setConteoDias(rs.getInt("conteo_dias"));
+        racha.setConteoDias(rs.getInt("cantidad_dias"));
         
-        java.sql.Date dbDate = rs.getDate("ultima_fecha_actividad");
+        java.sql.Date dbDate = rs.getDate("fecha_ultima_actividad");
         if (dbDate != null) {
             racha.setUltimaFechaActividad(dbDate.toLocalDate());
         }

@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart';
 import '../../core/app_colors.dart';
 import '../../services/api_client.dart';
 import '../../services/workout_schedule_service.dart';
+import '../../services/racha_service.dart';
 import 'routine_selection_screen.dart';
 import '../widgets/responsive.dart';
 import 'camera_screen.dart';
@@ -795,17 +796,58 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
   Future<void> _markExerciseComplete(String exerciseName) async {
     try {
       debugPrint('📝 Marcando $exerciseName como completado para fecha ${_selectedDate}');
-      
-      // Usar el nuevo método que solo actualiza el campo completado
-      await _scheduleService.markExerciseCompleted(
+
+      final rachaService = RachaService();
+      final fechaFormato = _selectedDate.toIso8601String().split('T')[0];
+      final response = await rachaService.marcarEjercicioCompletado(
         nombre: exerciseName,
-        fecha: _selectedDate,
+        fecha: fechaFormato,
       );
       
+      if (!mounted) return;
+      
       debugPrint('✅ $exerciseName marcado como completado');
+      debugPrint('🔥 Racha actualizada: ${response['dias_racha']} días (Activa: ${response['racha_activa']})');
+      
+      // Mostrar recompensas si existen en la respuesta
+      final recompensas = response['recompensas'] as List?;
+      if (recompensas != null && recompensas.isNotEmpty) {
+        String rewardMsg = '🎁 ¡Recompensas recibidas!\n';
+        for (var reward in recompensas) {
+          if (reward is Map) {
+            rewardMsg += '${reward['nombre'] ?? 'Recompensa'}: +${reward['cantidad'] ?? 0}\n';
+          }
+        }
+        debugPrint(rewardMsg);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(rewardMsg.trim()),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      
+      // Mostrar desbloqueo de ropa si aplica
+      final atuendosNuevos = (response['atuendos_nuevos'] ?? response['atuendosNuevos']) as List?;
+      final bool atuendosDesbloqueados =
+          (response['atuendos_desbloqueados'] ?? response['atuendosDesbloqueados']) == true;
+      if (atuendosDesbloqueados &&
+          atuendosNuevos != null &&
+          atuendosNuevos.isNotEmpty) {
+        final String clothMsg = '¡Atuendos desbloqueados!\n${atuendosNuevos.join('\n')}';
+        debugPrint(clothMsg);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(clothMsg),
+            backgroundColor: Colors.purple,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
       
       // Recargar los ejercicios para actualizar la UI inmediatamente
-      if (!mounted) return;
       await _loadExercisePlan(forDate: _selectedDate);
       
       if (!mounted) return;

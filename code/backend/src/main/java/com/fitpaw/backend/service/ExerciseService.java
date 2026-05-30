@@ -1,6 +1,7 @@
 package com.fitpaw.backend.service;
 
 import com.fitpaw.backend.DTOs.SaveCardioExerciseRequest;
+import com.fitpaw.backend.DTOs.ExerciseCompletionResponse;
 import com.fitpaw.backend.DTOs.SaveFuerzaExerciseRequest;
 import com.fitpaw.backend.repository.ConexionDB;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -146,16 +147,19 @@ public class ExerciseService {
      * Marcar ejercicio como completado (actualizar campo completado a true)
      * También gestiona rachas y recompensas
      */
-    public void markExerciseCompleted(int usuarioId, String nombre, LocalDate fecha) {
+    public ExerciseCompletionResponse markExerciseCompleted(int usuarioId, String nombre, LocalDate fecha) {
         System.out.println("\n=== MARCAR EJERCICIO COMPLETADO ===");
         System.out.println("Usuario: " + usuarioId + ", Ejercicio: " + nombre + ", Fecha: " + fecha);
         
         try (Connection conn = conexionDB.conectar()) {
+            conn.setAutoCommit(false);
             // Marcar el ejercicio como completado
             boolean ejercicioEncontrado = false;
+            boolean ejercicioActualizado = false;
 
             // Intentar actualizar en ejercicio_cardio
-            String sqlCardio = "UPDATE public.ejercicio_cardio SET completado = true WHERE usuario_id = ? AND nombre = ? AND fecha = ?";
+            String sqlCardio = "UPDATE public.ejercicio_cardio SET completado = true "
+                    + "WHERE usuario_id = ? AND nombre = ? AND fecha = ? AND COALESCE(completado, false) = false";
             try (PreparedStatement ps = conn.prepareStatement(sqlCardio)) {
                 ps.setInt(1, usuarioId);
                 ps.setString(2, nombre);
@@ -164,24 +168,32 @@ public class ExerciseService {
                 int rowsAffected = ps.executeUpdate();
                 if (rowsAffected > 0) {
                     ejercicioEncontrado = true;
+                    ejercicioActualizado = true;
                     System.out.println("✅ Ejercicio marcado en cardio");
+                } else if (existeEjercicio(conn, "ejercicio_cardio", usuarioId, nombre, fecha)) {
+                    ejercicioEncontrado = true;
+                    System.out.println("⏭️ Ejercicio cardio ya estaba completado");
                 }
             }
 
             // Si no encontró en cardio, intentar en ejercicio_fuerza
             if (!ejercicioEncontrado) {
-                String sqlFuerza = "UPDATE public.ejercicio_fuerza SET completado = true WHERE usuario_id = ? AND nombre = ? AND fecha = ?";
+                String sqlFuerza = "UPDATE public.ejercicio_fuerza SET completado = true "
+                        + "WHERE usuario_id = ? AND nombre = ? AND fecha = ? AND COALESCE(completado, false) = false";
                 try (PreparedStatement ps = conn.prepareStatement(sqlFuerza)) {
                     ps.setInt(1, usuarioId);
                     ps.setString(2, nombre);
                     ps.setDate(3, Date.valueOf(fecha));
                     
                     int rowsAffected = ps.executeUpdate();
-                    if (rowsAffected == 0) {
-                        throw new IllegalArgumentException("No se encontró el ejercicio: " + nombre);
+                    if (rowsAffected > 0) {
+                        ejercicioActualizado = true;
+                        ejercicioEncontrado = true;
+                        System.out.println("✅ Ejercicio marcado en fuerza");
+                    } else if (existeEjercicio(conn, "ejercicio_fuerza", usuarioId, nombre, fecha)) {
+                        ejercicioEncontrado = true;
+                        System.out.println("⏭️ Ejercicio fuerza ya estaba completado");
                     }
-                    ejercicioEncontrado = true;
-                    System.out.println("✅ Ejercicio marcado en fuerza");
                 }
             }
 
@@ -189,6 +201,20 @@ public class ExerciseService {
                 throw new IllegalArgumentException("No se encontró el ejercicio: " + nombre);
             }
 
+            ExerciseCompletionResponse response = new ExerciseCompletionResponse();
+            response.setUsuarioId(usuarioId);
+            response.setSuccess(true);
+
+            if (!ejercicioActualizado) {
+                int diasRacha = streakRewardService.obtenerDiasRachaActual(conn, usuarioId);
+                response.setMensaje("El ejercicio ya estaba completado");
+                response.setDiasRacha(diasRacha);
+                response.setRachaActiva(diasRacha > 0);
+                conn.commit();
+                return response;
+            }
+
+            List<Map<String, Object>> recompensas = new ArrayList<>();
             // ===== SISTEMA DE RACHAS Y RECOMPENSAS =====
             System.out.println("\n🏆 INICIANDO SISTEMA DE RECOMPENSAS...");
 
@@ -200,7 +226,9 @@ public class ExerciseService {
                 // Es el primer ejercicio del día - la racha fue activada
                 // Recompensa: +1 Calamar (50 puntos)
                 System.out.println("🦑 Otorgando Calamar...");
-                streakRewardService.otorgarAlimento(conn, usuarioId, "Calamar", 1);
+                if (streakRewardService.otorgarAlimento(conn, usuarioId, "Calamar", 1)) {
+                    recompensas.add(recompensa("Calamar", 1));
+                }
 
                 // Obtener los días de racha actual para revisar si es múltiplo de 5
                 int diasRacha = streakRewardService.obtenerDiasRachaActual(conn, usuarioId);
@@ -209,33 +237,67 @@ public class ExerciseService {
                 if (diasRacha > 0 && diasRacha % 5 == 0) {
                     // Múltiplo de 5 días - dar Coctel
                     System.out.println("🍸 Día múltiplo de 5! Otorgando Coctel...");
-                    streakRewardService.otorgarAlimento(conn, usuarioId, "Coctel", 1);
+                    if (streakRewardService.otorgarAlimento(conn, usuarioId, "Coctel", 1)) {
+                        recompensas.add(recompensa("Coctel", 1));
+                    }
                 }
             }
 
             // 2. Dar Krill por completar este ejercicio
             System.out.println("🦐 Otorgando Krill...");
-            streakRewardService.otorgarAlimento(conn, usuarioId, "Krill", 1);
+            if (streakRewardService.otorgarAlimento(conn, usuarioId, "Krill", 1)) {
+                recompensas.add(recompensa("Krill", 1));
+            }
 
-            // 3. Verificar si ya han completado los 4 ejercicios
-            System.out.println("🔍 Verificando si están los 4 ejercicios completados...");
-            if (streakRewardService.verificarLos4EjerciciosCompletados(conn, usuarioId, fecha)) {
-                // Dar 2 Peces (2 * 25 = 50 puntos)
-                System.out.println("🐟 ¡Los 4 ejercicios completados! Otorgando 2 Peces...");
-                streakRewardService.otorgarAlimento(conn, usuarioId, "Pez", 2);
+            // 3. Verificar si llegó exactamente al cuarto ejercicio completado del día
+            int ejerciciosCompletados = streakRewardService.contarEjerciciosCompletadosHoy(conn, usuarioId, fecha);
+            System.out.println("🔍 Ejercicios completados hoy: " + ejerciciosCompletados);
+            if (ejerciciosCompletados == 4) {
+                System.out.println("🐟 ¡Llegó a 4 ejercicios completados! Otorgando Pez...");
+                if (streakRewardService.otorgarAlimento(conn, usuarioId, "Pez", 1)) {
+                    recompensas.add(recompensa("Pez", 1));
+                }
             }
 
             // 4. Verificar desbloqueo de atuendos a los 30 días
             System.out.println("🎽 Verificando hito de 30 días...");
-            streakRewardService.verificarDesbloqueoAtuendos30Dias(conn, usuarioId);
+            List<String> atuendosNuevos = streakRewardService.verificarDesbloqueoAtuendos30Dias(conn, usuarioId);
             
             System.out.println("=== FIN DE RECOMPENSAS ===\n");
 
+            int diasRacha = streakRewardService.obtenerDiasRachaActual(conn, usuarioId);
+            response.setMensaje("Ejercicio marcado como completado");
+            response.setDiasRacha(diasRacha);
+            response.setRachaActiva(diasRacha > 0);
+            response.setRecompensas(recompensas);
+            response.setAtuendosNuevos(atuendosNuevos);
+            response.setAtuendosDesbloqueados(!atuendosNuevos.isEmpty());
+            conn.commit();
+            return response;
         } catch (SQLException e) {
             System.err.println("❌ Error SQL: " + e.getMessage());
             e.printStackTrace();
             throw new IllegalStateException("Error al marcar ejercicio como completado: " + e.getMessage());
         }
+    }
+
+    private boolean existeEjercicio(Connection conn, String tabla, int usuarioId, String nombre, LocalDate fecha) throws SQLException {
+        String sql = "SELECT 1 FROM public." + tabla + " WHERE usuario_id = ? AND nombre = ? AND fecha = ? LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, usuarioId);
+            ps.setString(2, nombre);
+            ps.setDate(3, Date.valueOf(fecha));
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private Map<String, Object> recompensa(String nombre, int cantidad) {
+        Map<String, Object> item = new HashMap<>();
+        item.put("nombre", nombre);
+        item.put("cantidad", cantidad);
+        return item;
     }
 
     /**

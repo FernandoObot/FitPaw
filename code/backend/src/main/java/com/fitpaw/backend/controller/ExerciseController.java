@@ -2,6 +2,7 @@ package com.fitpaw.backend.controller;
 
 import com.fitpaw.backend.DTOs.SaveCardioExerciseRequest;
 import com.fitpaw.backend.DTOs.SaveFuerzaExerciseRequest;
+import com.fitpaw.backend.DTOs.ExerciseCompletionResponse;
 import com.fitpaw.backend.service.ExerciseService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -15,7 +16,7 @@ import java.util.List;
 import java.time.LocalDate;
 
 @RestController
-@RequestMapping("/ejercicios")
+@RequestMapping({"/ejercicios", "/api/ejercicios"})
 public class ExerciseController {
 
     @Autowired
@@ -113,9 +114,11 @@ public class ExerciseController {
 
     /**
      * Marcar ejercicio como completado
-     * PATCH /ejercicios/completar
+     * POST/PATCH /ejercicios/completar
+     * 
+     * Retorna: ExerciseCompletionResponse con racha actualizada, recompensas y desbloqueos
      */
-    @PatchMapping("/completar")
+    @RequestMapping(value = "/completar", method = {RequestMethod.POST, RequestMethod.PATCH})
     public ResponseEntity<?> markExerciseCompleted(
             @RequestBody Map<String, Object> request,
             Authentication auth) {
@@ -136,21 +139,25 @@ public class ExerciseController {
             }
 
             LocalDate date = LocalDate.parse(fecha);
-            exerciseService.markExerciseCompleted(usuarioId, nombre, date);
             
-            return ResponseEntity.ok(Map.of(
-                    "mensaje", "Ejercicio marcado como completado",
-                    "nombre", nombre,
-                    "fecha", fecha
-            ));
+            ExerciseCompletionResponse response = exerciseService.markExerciseCompleted(usuarioId, nombre, date);
+            
+            return ResponseEntity.ok(response);
         } catch (java.time.format.DateTimeParseException e) {
-            return ResponseEntity.badRequest().body(Map.of("mensaje", "Formato de fecha inválido"));
+            ExerciseCompletionResponse response = new ExerciseCompletionResponse();
+            response.setSuccess(false);
+            response.setMensaje("Formato de fecha inválido: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("mensaje", e.getMessage()));
+            ExerciseCompletionResponse response = new ExerciseCompletionResponse();
+            response.setSuccess(false);
+            response.setMensaje(e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("mensaje", "Error: " + e.getMessage()));
+            ExerciseCompletionResponse response = new ExerciseCompletionResponse();
+            response.setSuccess(false);
+            response.setMensaje("Error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 

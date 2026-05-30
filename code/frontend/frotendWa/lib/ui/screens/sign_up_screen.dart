@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/app_colors.dart';
 import '../widgets/responsive.dart';
@@ -19,6 +20,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _terms = false;
   bool _isLoading = false;
+
+  bool _isValidPassword(String password) {
+    return password.length >= 8 &&
+        RegExp(r'[A-Za-z]').hasMatch(password) &&
+        RegExp(r'\d').hasMatch(password);
+  }
+
+  bool _isValidUsername(String username) {
+    return RegExp(r'^[A-Za-zÁÉÍÓÚáéíóúÑñ]{1,16}$').hasMatch(username);
+  }
 
   @override
   void dispose() {
@@ -43,8 +54,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
+    if (!_isValidUsername(nombreCompleto)) {
+      _showSnackBar('El nombre de usuario debe tener máximo 16 letras, sin números ni símbolos.');
+      return;
+    }
+
     if (!RegExp(r'^\d{10}$').hasMatch(telefono)) {
       _showSnackBar('El teléfono debe tener exactamente 10 dígitos.');
+      return;
+    }
+
+    if (!_isValidPassword(password)) {
+      _showSnackBar('La contraseña debe tener mínimo 8 caracteres, una letra y un número.');
       return;
     }
 
@@ -115,8 +136,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   SizedBox(height: 26 * scale),
                   _RegField(
                     controller: _nameController,
-                    hint: 'Nombre completo',
+                    hint: 'Nombre de usuario',
                     icon: Icons.person_outline_rounded,
+                    maxLength: 16,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-zÁÉÍÓÚáéíóúÑñ]')),
+                    ],
                     textInputAction: TextInputAction.next,
                   ),
                   SizedBox(height: 12 * scale),
@@ -208,7 +233,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 }
 
-class _RegField extends StatelessWidget {
+class _RegField extends StatefulWidget {
   const _RegField({
     required this.controller,
     required this.hint,
@@ -216,6 +241,8 @@ class _RegField extends StatelessWidget {
     this.obscure = false,
     this.keyboardType,
     this.textInputAction,
+    this.maxLength,
+    this.inputFormatters,
   });
 
   final TextEditingController controller;
@@ -224,19 +251,47 @@ class _RegField extends StatelessWidget {
   final bool obscure;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
+  final int? maxLength;
+  final List<TextInputFormatter>? inputFormatters;
+
+  @override
+  State<_RegField> createState() => _RegFieldState();
+}
+
+class _RegFieldState extends State<_RegField> {
+  late bool _hideText;
+
+  @override
+  void initState() {
+    super.initState();
+    _hideText = widget.obscure;
+  }
 
   @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: controller,
-      obscureText: obscure,
-      keyboardType: keyboardType,
-      textInputAction: textInputAction,
+      controller: widget.controller,
+      obscureText: widget.obscure && _hideText,
+      keyboardType: widget.keyboardType,
+      textInputAction: widget.textInputAction,
+      maxLength: widget.maxLength,
+      inputFormatters: widget.inputFormatters,
       decoration: InputDecoration(
-        hintText: hint,
+        counterText: '',
+        hintText: widget.hint,
         hintStyle: TextStyle(color: AppColors.faintText, fontSize: Responsive.fs(context, 13)),
-        prefixIcon: Icon(icon, color: AppColors.faintText, size: 20),
-        suffixIcon: obscure ? const Icon(Icons.visibility_off_outlined, color: AppColors.faintText, size: 20) : null,
+        prefixIcon: Icon(widget.icon, color: AppColors.faintText, size: 20),
+        suffixIcon: widget.obscure
+            ? IconButton(
+                tooltip: _hideText ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                onPressed: () => setState(() => _hideText = !_hideText),
+                icon: Icon(
+                  _hideText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: AppColors.faintText,
+                  size: 20,
+                ),
+              )
+            : null,
       ),
     );
   }

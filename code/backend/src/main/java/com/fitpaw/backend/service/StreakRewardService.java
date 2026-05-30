@@ -225,13 +225,13 @@ public class StreakRewardService {
      * Otorga alimento a la mascota del usuario
      * NOTA: Asume que los registros de comida ya existen en mascota_alimento (creados al registrarse)
      */
-    public void otorgarAlimento(Connection conn, int usuarioId, String nombreComida, int cantidad) throws SQLException {
+    public boolean otorgarAlimento(Connection conn, int usuarioId, String nombreComida, int cantidad) throws SQLException {
         System.out.println("🍽️ Intentando otorgar: " + cantidad + "x " + nombreComida + " a usuario " + usuarioId);
         
         int mascotaId = obtenerMascotaId(conn, usuarioId);
         if (mascotaId <= 0) {
             System.out.println("❌ No se pudo otorgar alimento: mascota no encontrada");
-            return;
+            return false;
         }
 
         try {
@@ -248,8 +248,19 @@ public class StreakRewardService {
                 
                 if (updated > 0) {
                     System.out.println("✅ Alimento actualizado: " + nombreComida + " +=" + cantidad);
+                    return true;
                 } else {
-                    System.out.println("⚠️ No se encontró la comida " + nombreComida + " para mascota " + mascotaId);
+                    String insertSql = "INSERT INTO public.mascota_alimento (mascota_id, nombre_comida, cantidad, beneficio_puntos) "
+                            + "VALUES (?, ?, ?, ?)";
+                    try (PreparedStatement psInsert = conn.prepareStatement(insertSql)) {
+                        psInsert.setInt(1, mascotaId);
+                        psInsert.setString(2, nombreComida);
+                        psInsert.setInt(3, cantidad);
+                        psInsert.setInt(4, beneficioPuntos);
+                        psInsert.executeUpdate();
+                        System.out.println("✅ Alimento creado: " + nombreComida + " +=" + cantidad);
+                        return true;
+                    }
                 }
             }
         } catch (SQLException e) {
@@ -280,7 +291,7 @@ public class StreakRewardService {
     /**
      * Verifica si se alcanzó racha de 30 días y desbloquea atuendos
      */
-    public void verificarDesbloqueoAtuendos30Dias(Connection conn, int usuarioId) throws SQLException {
+    public java.util.List<String> verificarDesbloqueoAtuendos30Dias(Connection conn, int usuarioId) throws SQLException {
         String sqlObtenerRacha = "SELECT cantidad_dias FROM public.usuarios_racha WHERE usuario_id = ? ORDER BY racha_id DESC LIMIT 1";
         
         try (PreparedStatement ps = conn.prepareStatement(sqlObtenerRacha)) {
@@ -289,23 +300,29 @@ public class StreakRewardService {
                 if (rs.next()) {
                     int diasRacha = rs.getInt("cantidad_dias");
                     
-                    if (diasRacha == 30) {
+                    if (diasRacha >= 30) {
                         System.out.println("🎉 ¡Racha de 30 días alcanzada para usuario " + usuarioId + "!");
                         int mascotaId = obtenerMascotaId(conn, usuarioId);
                         if (mascotaId > 0) {
-                            crearAtuendosDesbloqueados(conn, mascotaId);
+                            return crearAtuendosDesbloqueados(conn, mascotaId);
                         }
                     }
                 }
             }
         }
+        return new java.util.ArrayList<>();
     }
 
     /**
-     * Crea los 2 atuendos desbloqueados a los 30 días
+     * Crea los atuendos desbloqueados a los 30 días
+     * Los 5 prendas disponibles son: Conjunto 1, 2, 3, 4, 5
+     * Al registrarse, solo "vacio" se crea
+     * A los 30 días, se desbloquean Conjunto 1, 2, 3, 4, 5
      */
-    private void crearAtuendosDesbloqueados(Connection conn, int mascotaId) throws SQLException {
-        String[] atuendos = {"Ropa deportiva verde", "Ropa deportiva morada"};
+    private java.util.List<String> crearAtuendosDesbloqueados(Connection conn, int mascotaId) throws SQLException {
+        // Estos son los 5 prendas que se muestran en el frontend
+        String[] atuendos = {"Conjunto 1", "Conjunto 2", "Conjunto 3", "Conjunto 4", "Conjunto 5"};
+        java.util.List<String> nuevos = new java.util.ArrayList<>();
         
         for (String atuendo : atuendos) {
             // Verificar si ya existe
@@ -326,12 +343,14 @@ public class StreakRewardService {
                     psInsert.setInt(1, mascotaId);
                     psInsert.setString(2, atuendo);
                     psInsert.setBoolean(3, false); // No equipado por defecto
-                    int inserted = psInsert.executeUpdate();
-                    System.out.println("✅ Atuendo creado: " + atuendo + " para mascota " + mascotaId + " (rows: " + inserted + ")");
+                    psInsert.executeUpdate();
+                    nuevos.add(atuendo);
+                    System.out.println("✅ Atuendo desbloqueado: " + atuendo + " para mascota " + mascotaId);
                 }
             } else {
                 System.out.println("⚠️ Atuendo ya existe: " + atuendo);
             }
         }
+        return nuevos;
     }
 }
