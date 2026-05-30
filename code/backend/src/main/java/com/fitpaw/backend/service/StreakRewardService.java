@@ -239,11 +239,12 @@ public class StreakRewardService {
             System.out.println("📊 Beneficio de puntos para " + nombreComida + ": " + beneficioPuntos);
 
             // Actualizar cantidad existente (el registro SIEMPRE existe)
-            String sqlUpdate = "UPDATE public.mascota_alimento SET cantidad = cantidad + ? WHERE mascota_id = ? AND nombre_comida = ?";
+            String sqlUpdate = "UPDATE public.mascota_alimento SET cantidad = cantidad + ?, beneficio_puntos = ? WHERE mascota_id = ? AND nombre_comida = ?";
             try (PreparedStatement psUpdate = conn.prepareStatement(sqlUpdate)) {
                 psUpdate.setInt(1, cantidad);
-                psUpdate.setInt(2, mascotaId);
-                psUpdate.setString(3, nombreComida);
+                psUpdate.setInt(2, beneficioPuntos);
+                psUpdate.setInt(3, mascotaId);
+                psUpdate.setString(4, nombreComida);
                 int updated = psUpdate.executeUpdate();
                 
                 if (updated > 0) {

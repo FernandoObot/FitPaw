@@ -8,7 +8,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -85,6 +87,23 @@ public class ProgressPhotoController {
             int usuarioId = getUsuarioIdFromAuth();
             List<ProgressPhotoResponse> fotos = storageService.obtenerTodasLasFotos(usuarioId);
             return ResponseEntity.ok(fotos);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("mensaje", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("mensaje", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("mensaje", "Error interno: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{fotoId}")
+    public ResponseEntity<?> eliminarFoto(@PathVariable int fotoId) {
+        try {
+            int usuarioId = getUsuarioIdFromAuth();
+            storageService.eliminarFotoProgreso(usuarioId, fotoId);
+            return ResponseEntity.ok(Map.of("mensaje", "Foto eliminada"));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(Map.of("mensaje", e.getReason()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("mensaje", e.getMessage()));
         } catch (IllegalStateException e) {

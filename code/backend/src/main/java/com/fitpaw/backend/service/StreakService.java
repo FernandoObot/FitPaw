@@ -235,24 +235,53 @@ public class StreakService {
                     // Actualizar cantidad existente
                     int alimentoId = rs.getInt("alimento_id");
                     int cantidadActual = rs.getInt("cantidad");
-                    String updateSql = "UPDATE public.mascota_alimento SET cantidad = ? WHERE alimento_id = ?";
+                    String updateSql = "UPDATE public.mascota_alimento SET cantidad = ?, beneficio_puntos = ? WHERE alimento_id = ?";
                     try (PreparedStatement updatePs = conn.prepareStatement(updateSql)) {
                         updatePs.setInt(1, cantidadActual + cantidad);
-                        updatePs.setInt(2, alimentoId);
+                        updatePs.setInt(2, obtenerBeneficioPuntos(nombreComida));
+                        updatePs.setInt(3, alimentoId);
                         updatePs.executeUpdate();
                     }
                 } else {
                     // Insertar nuevo alimento
                     String insertSql = "INSERT INTO public.mascota_alimento (mascota_id, nombre_comida, cantidad, beneficio_puntos) "
-                            + "VALUES (?, ?, ?, 0)";
+                            + "VALUES (?, ?, ?, ?)";
                     try (PreparedStatement insertPs = conn.prepareStatement(insertSql)) {
                         insertPs.setInt(1, mascotaId);
                         insertPs.setString(2, nombreComida);
                         insertPs.setInt(3, cantidad);
+                        insertPs.setInt(4, obtenerBeneficioPuntos(nombreComida));
                         insertPs.executeUpdate();
                     }
                 }
             }
+        }
+    }
+
+    private int obtenerBeneficioPuntos(String nombreComida) {
+        if (nombreComida == null) {
+            return 0;
+        }
+        String comida = nombreComida.trim().toLowerCase()
+                .replace('á', 'a')
+                .replace('é', 'e')
+                .replace('í', 'i')
+                .replace('ó', 'o')
+                .replace('ú', 'u')
+                .replace('ñ', 'n');
+        switch (comida) {
+            case "krill":
+            case "camaron":
+                return 15;
+            case "pez":
+                return 25;
+            case "calamar":
+                return 50;
+            case "coctel":
+            case "coctel de mariscos":
+                return 100;
+            default:
+                return 0;
         }
     }
 

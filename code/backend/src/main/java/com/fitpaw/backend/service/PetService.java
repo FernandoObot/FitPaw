@@ -23,8 +23,11 @@ public class PetService {
     private final ConexionDB conexionDB;
     private final StreakRewardService streakRewardService;
 
-    @Value("${pet.hunger.decrease-ms-per-point:600000}")
-    private long decreaseMsPerPoint; // default 10 minutes per 1 hunger point
+    @Value("${pet.hunger.decrease-ms-per-step:${pet.hunger.decrease-ms-per-point:300000}}")
+    private long decreaseMsPerStep; // default 5 minutes
+
+    @Value("${pet.hunger.points-per-step:25}")
+    private int decreasePointsPerStep;
 
     public PetService(ConexionDB conexionDB, StreakRewardService streakRewardService) {
         this.conexionDB = conexionDB;
@@ -195,7 +198,8 @@ public class PetService {
         if (last == null) return storedHunger;
         long elapsed = System.currentTimeMillis() - last.getTime();
         if (elapsed <= 0) return storedHunger;
-        long pointsLost = decreaseMsPerPoint <= 0 ? 0 : (elapsed / decreaseMsPerPoint);
+        long elapsedSteps = decreaseMsPerStep <= 0 ? 0 : (elapsed / decreaseMsPerStep);
+        long pointsLost = elapsedSteps * Math.max(0, decreasePointsPerStep);
         long cur = storedHunger - pointsLost;
         if (cur > 100) cur = 100;
         if (cur < 0) cur = 0;
@@ -233,10 +237,10 @@ public class PetService {
         String k = key.trim().toLowerCase();
         // normalize basic accents
         k = k.replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u').replace('ñ','n');
-        if (k.equals("krill") || k.equals("camaron") || k.equals("shrimp")) return 5;
-        if (k.equals("pez") || k.equals("fish")) return 10;
+        if (k.equals("krill") || k.equals("camaron") || k.equals("shrimp")) return 15;
+        if (k.equals("pez") || k.equals("fish")) return 25;
         if (k.equals("calamar") || k.equals("squid")) return 50;
-        if (k.equals("coctel") || k.equals("cocktail")) return 50;
+        if (k.equals("coctel") || k.equals("coctel de mariscos") || k.equals("cocktail")) return 100;
         return 0;
     }
 
@@ -267,7 +271,8 @@ public class PetService {
                         while (rs.next()) {
                             String nombreComida = rs.getString("nombre_comida");
                             Integer cantidad = rs.getInt("cantidad");
-                            Integer beneficioPuntos = rs.getInt("beneficio_puntos");
+                            int puntosConfigurados = mapItemToPoints(nombreComida);
+                            Integer beneficioPuntos = puntosConfigurados > 0 ? puntosConfigurados : rs.getInt("beneficio_puntos");
                             foods.add(new com.fitpaw.backend.DTOs.PetFoodResponse(nombreComida, cantidad, beneficioPuntos));
                         }
                     }

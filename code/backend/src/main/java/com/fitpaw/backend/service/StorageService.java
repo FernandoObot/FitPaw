@@ -102,6 +102,29 @@ public class StorageService {
         }
     }
 
+    public void eliminarFotoProgreso(int usuarioId, int fotoId) {
+        try (Connection conn = conexionDB.conectar()) {
+            String urlFoto = obtenerUrlFoto(conn, usuarioId, fotoId);
+            if (urlFoto == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Foto no encontrada");
+            }
+
+            String sql = "DELETE FROM public.usuarios_fotos_progreso WHERE usuario_id = ? AND foto_id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setInt(1, usuarioId);
+                pstmt.setInt(2, fotoId);
+                int deleted = pstmt.executeUpdate();
+                if (deleted == 0) {
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Foto no encontrada");
+                }
+            }
+
+            eliminarDeSupabaseSiEsPosible(urlFoto);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al eliminar foto de progreso: " + e.getMessage(), e);
+        }
+    }
+
     private void validarArchivo(MultipartFile foto) {
         if (foto == null || foto.isEmpty()) {
             throw new IllegalArgumentException("La foto es obligatoria");
@@ -174,9 +197,12 @@ public class StorageService {
         List<ProgressPhotoResponse> fotosHoy = obtenerFotosPorRango(conn, usuarioId, inicioDelDia(), inicioDelSiguienteDia());
         List<PhotoSlotResponse> slots = construirSlots(fotosHoy);
 
-        // Obtener fotos de hace 15 días
+        // Obtener fotos de hace 15 días; si no hay, usar las más antiguas.
         List<ProgressPhotoResponse> fotosHace15Dias = obtenerFotosPorRango(conn, usuarioId, inicioDiaHace15Dias(), inicioDelDia15DiasAdelante());
-        List<PhotoSlotResponse> slotsHace15Dias = construirSlots(fotosHace15Dias);
+        if (fotosHace15Dias.isEmpty()) {
+            fotosHace15Dias = obtenerFotosMasAntiguas(conn, usuarioId, DAILY_LIMIT);
+        }
+        List<PhotoSlotResponse> slotsHace15Dias = construirSlotsPorOrden(fotosHace15Dias);
 
         DailyProgressPhotosResponse response = new DailyProgressPhotosResponse();
         response.setLimiteDiario(DAILY_LIMIT);
@@ -214,6 +240,30 @@ public class StorageService {
         return slots;
     }
 
+    private List<PhotoSlotResponse> construirSlotsPorOrden(List<ProgressPhotoResponse> fotos) {
+        List<PhotoSlotResponse> slots = new ArrayList<>();
+        for (int slot = 1; slot <= DAILY_LIMIT; slot++) {
+            PhotoSlotResponse slotResponse = new PhotoSlotResponse();
+            slotResponse.setSlot(slot);
+            slotResponse.setFoto(slot <= fotos.size() ? fotos.get(slot - 1) : null);
+            slots.add(slotResponse);
+        }
+        return slots;
+    }
+
+    private List<ProgressPhotoResponse> obtenerFotosMasAntiguas(Connection conn, int usuarioId, int limite) throws SQLException {
+        String sql = "SELECT foto_id, usuario_id, url_foto, posicion, fecha "
+                + "FROM public.usuarios_fotos_progreso "
+                + "WHERE usuario_id = ? "
+                + "ORDER BY fecha ASC, foto_id ASC "
+                + "LIMIT ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, usuarioId);
+            pstmt.setInt(2, limite);
+            return mapFotos(pstmt);
+        }
+    }
+
     private List<ProgressPhotoResponse> obtenerFotosPorRango(Connection conn, int usuarioId, Timestamp inicio, Timestamp fin) throws SQLException {
         StringBuilder sql = new StringBuilder(
                 "SELECT foto_id, usuario_id, url_foto, posicion, fecha FROM public.usuarios_fotos_progreso WHERE usuario_id = ?");
@@ -229,20 +279,64 @@ public class StorageService {
                 pstmt.setTimestamp(3, fin);
             }
 
-            List<ProgressPhotoResponse> fotos = new ArrayList<>();
+            return mapFotos(pstmt);
+        }
+    }
+
+    private List<ProgressPhotoResponse> mapFotos(PreparedStatement pstmt) throws SQLException {
+        List<ProgressPhotoResponse> fotos = new ArrayList<>();
+        try (ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                ProgressPhotoResponse foto = new ProgressPhotoResponse();
+                foto.setFotoId(rs.getInt("foto_id"));
+                foto.setUsuarioId(rs.getInt("usuario_id"));
+                foto.setUrlFoto(rs.getString("url_foto"));
+                foto.setPosicion(rs.getString("posicion"));
+                Timestamp fecha = rs.getTimestamp("fecha");
+                foto.setFecha(fecha != null ? fecha.toLocalDateTime() : null);
+                fotos.add(foto);
+            }
+        }
+        return fotos;
+    }
+
+    private String obtenerUrlFoto(Connection conn, int usuarioId, int fotoId) throws SQLException {
+        String sql = "SELECT url_foto FROM public.usuarios_fotos_progreso WHERE usuario_id = ? AND foto_id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, usuarioId);
+            pstmt.setInt(2, fotoId);
             try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    ProgressPhotoResponse foto = new ProgressPhotoResponse();
-                    foto.setFotoId(rs.getInt("foto_id"));
-                    foto.setUsuarioId(rs.getInt("usuario_id"));
-                    foto.setUrlFoto(rs.getString("url_foto"));
-                    foto.setPosicion(rs.getString("posicion"));
-                    Timestamp fecha = rs.getTimestamp("fecha");
-                    foto.setFecha(fecha != null ? fecha.toLocalDateTime() : null);
-                    fotos.add(foto);
+                if (rs.next()) {
+                    return rs.getString("url_foto");
                 }
             }
-            return fotos;
+        }
+        return null;
+    }
+
+    private void eliminarDeSupabaseSiEsPosible(String urlFoto) {
+        String publicPrefix = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/";
+        if (urlFoto == null || !urlFoto.startsWith(publicPrefix)) {
+            return;
+        }
+
+        String path = urlFoto.substring(publicPrefix.length());
+        String deleteUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/" + path;
+        try {
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(deleteUrl))
+                    .header("Authorization", "Bearer " + SUPABASE_KEY)
+                    .header("apikey", SUPABASE_KEY)
+                    .DELETE()
+                    .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                System.out.println("No se pudo eliminar archivo en Supabase. Codigo: " + response.statusCode());
+                System.out.println("Detalles: " + response.body());
+            }
+        } catch (Exception e) {
+            System.out.println("No se pudo eliminar archivo en Supabase: " + e.getMessage());
         }
     }
 
