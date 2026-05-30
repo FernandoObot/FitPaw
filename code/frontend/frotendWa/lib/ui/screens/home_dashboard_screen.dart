@@ -270,7 +270,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        'Objetivo del dia - Lunes',
+                                        'Progreso personal',
                                         style: TextStyle(
                                           color: AppColors.textPrimary,
                                           fontSize: Responsive.fs(context, 16),
@@ -391,7 +391,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                               icon: Icons.query_stats_rounded,
                               isActive: _selectedBottomIndex == 1,
                               scale: scale,
-                              onTap: () => _selectBottom(1),
+                              onTap: () => _handleBottomTap(1),
                             ),
                             _BottomBarIcon(
                               icon: Icons.pets_rounded,
@@ -404,7 +404,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                               icon: Icons.camera_alt_outlined,
                               isActive: _selectedBottomIndex == 3,
                               scale: scale,
-                              onTap: () => _selectBottom(3),
+                              onTap: () => _handleBottomTap(3),
                             ),
                             _BottomBarIcon(
                               icon: Icons.person_outline_rounded,

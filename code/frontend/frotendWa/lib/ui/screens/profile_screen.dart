@@ -33,19 +33,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final TextEditingController _weightController;
   late final TextEditingController _ageController;
 
-  String _profileName = 'Jonathan';
-  String _profileGoal = 'Perder grasa';
-  String _profileHeight = '170 cm';
-  String _profileWeight = '65 kg';
-  String _profileAge = '21';
+  String _profileName = '...';
+  String _profileGoal = '...';
+  String _profileHeight = '...';
+  String _profileWeight = '...';
+  String _profileAge = '...';
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: _profileName);
     _goalController = TextEditingController(text: _profileGoal);
-    _heightController = TextEditingController(text: _profileHeight.replaceAll(' cm', ''));
-    _weightController = TextEditingController(text: _profileWeight.replaceAll(' kg', ''));
+    _heightController = TextEditingController();
+    _weightController = TextEditingController();
     _ageController = TextEditingController(text: _profileAge);
     _authService = AuthService(ApiClient());
     _loadProfile();
@@ -340,23 +340,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _startProfileEdit() {
     setState(() {
       _isEditingProfile = true;
-      _nameController.text = _profileName;
-      _goalController.text = _profileGoal;
-      _heightController.text = _profileHeight.replaceAll(' cm', '');
-      _weightController.text = _profileWeight.replaceAll(' kg', '');
-      _ageController.text = _profileAge;
+      _nameController.text = _inputValue(_profileName);
+      _goalController.text = _inputValue(_profileGoal);
+      _heightController.text = _inputValue(_profileHeight.replaceAll(' cm', ''));
+      _weightController.text = _inputValue(_profileWeight.replaceAll(' kg', ''));
+      _ageController.text = _inputValue(_profileAge);
     });
   }
 
   void _cancelProfileEdits() {
     setState(() {
       _isEditingProfile = false;
-      _nameController.text = _profileName;
-      _goalController.text = _profileGoal;
-      _heightController.text = _profileHeight.replaceAll(' cm', '');
-      _weightController.text = _profileWeight.replaceAll(' kg', '');
-      _ageController.text = _profileAge;
+      _nameController.text = _inputValue(_profileName);
+      _goalController.text = _inputValue(_profileGoal);
+      _heightController.text = _inputValue(_profileHeight.replaceAll(' cm', ''));
+      _weightController.text = _inputValue(_profileWeight.replaceAll(' kg', ''));
+      _ageController.text = _inputValue(_profileAge);
     });
+  }
+
+  String _inputValue(String value) {
+    return value == '...' ? '' : value;
   }
 
   Future<void> _saveProfileEdits() async {
@@ -444,11 +448,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             }
             
             // Actualizar controllers
-            _nameController.text = _profileName;
-            _goalController.text = _profileGoal;
-            _heightController.text = _profileHeight.replaceAll(' cm', '');
-            _weightController.text = _profileWeight.replaceAll(' kg', '');
-            _ageController.text = _profileAge;
+            _nameController.text = _inputValue(_profileName);
+            _goalController.text = _inputValue(_profileGoal);
+            _heightController.text = _inputValue(_profileHeight.replaceAll(' cm', ''));
+            _weightController.text = _inputValue(_profileWeight.replaceAll(' kg', ''));
+            _ageController.text = _inputValue(_profileAge);
             debugPrint('✅ Perfil completamente actualizado');
           });
         }

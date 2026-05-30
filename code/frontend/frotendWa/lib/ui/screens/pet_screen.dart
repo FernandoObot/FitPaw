@@ -63,15 +63,6 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
   List<Map<String, dynamic>> _foodInventory = [];
   List<Map<String, dynamic>> _petClothing = [];
   bool _isLoadingPet = true;
-  String _loadErrorMessage = '';
-  
-  // Mapeo de nombres de comida del backend
-  Map<String, String> get _foodNameMapping => {
-    'Pez': 'pez',
-    'Krill': 'camaron',
-    'Calamar': 'calamar',
-    'Coctel': 'coctel',
-  };
   
   double get _foodLevel => _petStatus?['hambre']?.toDouble() ?? 100;
   String _statusMessage = '';
@@ -134,22 +125,17 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
         _petName = petStatus['nombre'] ?? 'Pingui';
         _nameController.text = _petName;
         _isLoadingPet = false;
-        _loadErrorMessage = '';
         
-        // Obtener la ropa que está equipada actualmente
         final equipadaIndex = _petClothing.indexWhere((r) => r['esta_equipado'] == true);
         if (equipadaIndex >= 0) {
-          final nombreEquipado = (_petClothing[equipadaIndex]['nombre_ropa'] as String?)?.toLowerCase() ?? '';
-          // Si la equipada es "vacio", significa que la mascota no tiene ropa
-          if (nombreEquipado == 'vacio') {
-            _appliedConjunto = null;
-          } else {
-            _appliedConjunto = equipadaIndex;
-          }
+          final nombreEquipado = (_petClothing[equipadaIndex]['nombre_ropa'] as String?) ?? '';
+          _appliedConjunto = _outfitSlotForName(nombreEquipado);
+        } else {
+          _appliedConjunto = null;
         }
       });
       
-      debugPrint('✅ Datos de mascota cargados: ${_petName}, hambre=${_foodLevel.toInt()}');
+      debugPrint('✅ Datos de mascota cargados: $_petName, hambre=${_foodLevel.toInt()}');
       debugPrint('🍽️ Comidas cargadas: ${_foodInventory.length} tipos');
       debugPrint('👕 Ropa cargada: ${_petClothing.length} prendas');
       
@@ -160,10 +146,26 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
     } catch (e) {
       setState(() {
         _isLoadingPet = false;
-        _loadErrorMessage = 'Error: $e';
       });
       debugPrint('❌ Error cargando mascota: $e');
     }
+  }
+
+  int? _outfitSlotForName(String nombreRopa) {
+    final lower = nombreRopa.toLowerCase();
+    if (lower == 'vacio') {
+      return null;
+    }
+    if (lower.contains('conjunto 1') || lower.contains('verde') || lower.contains('celeste')) {
+      return 0;
+    }
+    if (lower.contains('conjunto 2') ||
+        lower.contains('morada') ||
+        lower.contains('morado') ||
+        lower.contains('rosa')) {
+      return 1;
+    }
+    return null;
   }
 
   @override
@@ -194,37 +196,22 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
     _hungerTimers.clear();
   }
 
-  /// Inicia el timer para disminuir el hambre cada 60 segundos (1 punto por minuto)
+  /// Refresca el hambre desde backend cada segundo.
   void _startHungerDecreaseTimer() {
     _cancelHungerTimers();
     
-    final timer = Timer.periodic(const Duration(seconds: 60), (_) async {
+    final timer = Timer.periodic(const Duration(seconds: 1), (_) async {
       if (!mounted || _petStatus == null) return;
-      
-      final currentHunger = _foodLevel.toInt();
-      
-      if (currentHunger > 0) {
-        final newHunger = (currentHunger - 1).clamp(0, 100);
-        
-        debugPrint('🍽️ Hambre disminuyendo: $currentHunger → $newHunger');
-        
-        try {
-          // Actualizar en BD
-          final response = await ApiClient().post(
-            '/pet/hunger-decrease',
-            body: {'cantidad': newHunger},
-            needsAuth: true,
-          );
-          
-          // Actualizar UI
-          setState(() {
-            _petStatus?['hambre'] = newHunger;
-          });
-          
-          _updatePenguinByLevel();
-        } catch (e) {
-          debugPrint('❌ Error disminuyendo hambre: $e');
-        }
+
+      try {
+        final petStatus = await ApiClient().getPetStatus();
+        if (!mounted) return;
+        setState(() {
+          _petStatus = petStatus;
+        });
+        _updatePenguinByLevel();
+      } catch (e) {
+        debugPrint('❌ Error refrescando hambre: $e');
       }
     });
     
@@ -354,47 +341,49 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
           scale: Responsive.scale(context),
           petClothing: _petClothing,
           appliedConjunto: _appliedConjunto,
-          onApply: (index) async {
-            // Obtener el ID de la ropa
-            if (index < _petClothing.length) {
-              final ropaId = _petClothing[index]['ropa_id'] as int;
+          onApply: (originalIndex, outfitSlot) async {
+            if (originalIndex < _petClothing.length) {
               try {
-                await ApiClient().updateClothingEquipped(ropaId, true);
+                await ApiClient().updateClothingSlotEquipped(outfitSlot, true);
                 setState(() {
-                  _appliedConjunto = index;
-                  // Actualizar visualmente según el nombre de la ropa
-                  final nombreRopa = (_petClothing[index]['nombre_ropa'] as String).toLowerCase();
-                  if (nombreRopa.contains('conjunto 1') || nombreRopa.contains('paw celeste')) {
-                    _penguinAsset = _conjunto1Base;
-                  } else if (nombreRopa.contains('conjunto 2') || nombreRopa.contains('paw rosa')) {
-                    _penguinAsset = _conjunto2Base;
+                  _appliedConjunto = outfitSlot;
+                  for (final ropa in _petClothing) {
+                    ropa['esta_equipado'] = false;
                   }
+                  _petClothing[originalIndex]['esta_equipado'] = true;
                 });
                 _updatePenguinByLevel();
-                debugPrint('✅ Ropa equipada: ${_petClothing[index]['nombre_ropa']}');
+                debugPrint('✅ Ropa equipada: ${_petClothing[originalIndex]['nombre_ropa']}');
               } catch (e) {
                 debugPrint('❌ Error equipando ropa: $e');
                 _statusMessage = 'Error al equipar ropa';
               }
             }
           },
-          onRemove: (index) async {
-            // Al remover ropa, equipar la prenda "vacio" (sin ropa)
+          onRemove: () async {
             final vacioIndex = _petClothing.indexWhere((r) => (r['nombre_ropa'] as String?)?.toLowerCase() == 'vacio');
-            if (vacioIndex >= 0) {
-              final ropaId = _petClothing[vacioIndex]['ropa_id'] as int;
-              try {
-                await ApiClient().updateClothingEquipped(ropaId, true);
-                setState(() {
-                  _appliedConjunto = null;
-                  _penguinAsset = _defaultHappy;
-                });
-                _updatePenguinByLevel();
-                debugPrint('✅ Ropa removida - equipada prenda vacio');
-              } catch (e) {
-                debugPrint('❌ Error removiendo ropa: $e');
+            try {
+              await ApiClient().updateClothingNameEquipped('vacio', true);
+              setState(() {
+                _appliedConjunto = null;
+                for (final ropa in _petClothing) {
+                  ropa['esta_equipado'] = false;
+                }
+                if (vacioIndex >= 0) {
+                  _petClothing[vacioIndex]['esta_equipado'] = true;
+                }
+                _penguinAsset = _defaultHappy;
+              });
+              _updatePenguinByLevel();
+              debugPrint('✅ Ropa removida - equipada prenda vacio');
+            } catch (e) {
+              debugPrint('❌ Error removiendo ropa: $e');
+              setState(() {
                 _statusMessage = 'Error al remover ropa';
-              }
+                if (vacioIndex < 0) {
+                  _penguinAsset = _defaultHappy;
+                }
+              });
             }
           },
         );
@@ -973,8 +962,8 @@ class _ClosetSheet extends StatefulWidget {
   final List<Map<String, dynamic>> petClothing;
   // currently applied conjunto index (null = none)
   final int? appliedConjunto;
-  final void Function(int)? onApply;
-  final void Function(int)? onRemove;
+  final void Function(int originalIndex, int outfitSlot)? onApply;
+  final VoidCallback? onRemove;
 
   @override
   State<_ClosetSheet> createState() => _ClosetSheetState();
@@ -988,6 +977,8 @@ class _ClosetSheetState extends State<_ClosetSheet> {
     'Conjunto 4',
     'Conjunto 5',
   ];
+
+  static const int _unlockedRewardSlots = 2;
 
   int? _appliedConjunto;
   // conjunto actualmente seleccionado en el modal (null = ninguno)
@@ -1043,6 +1034,11 @@ class _ClosetSheetState extends State<_ClosetSheet> {
   }
 
   Map<String, dynamic>? _findUnlockedOutfit(String outfitName) {
+    final slotIndex = _orderedOutfits.indexOf(outfitName);
+    if (slotIndex < 0 || slotIndex >= _unlockedRewardSlots) {
+      return null;
+    }
+
     for (final ropa in widget.petClothing) {
       final nombre = (ropa['nombre_ropa'] as String?)?.toLowerCase() ?? '';
       if (_matchesOutfitName(nombre, outfitName)) {
@@ -1131,7 +1127,7 @@ class _ClosetSheetState extends State<_ClosetSheet> {
 
                           return InkWell(
                             borderRadius: BorderRadius.circular(16 * scale),
-                            onTap: unlocked ? () => _handleSelect(originalIndex) : null,
+                            onTap: unlocked ? () => _handleSelect(index) : null,
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(16 * scale),
                               child: Stack(
@@ -1141,7 +1137,7 @@ class _ClosetSheetState extends State<_ClosetSheet> {
                                       color: AppColors.fieldBackground.withValues(alpha: 0.8),
                                       borderRadius: BorderRadius.circular(16 * scale),
                                       border: Border.all(
-                                        color: unlocked && originalIndex == _appliedConjunto
+                                        color: unlocked && index == _appliedConjunto
                                             ? AppColors.mintPrimary
                                             : AppColors.blueSecondary.withValues(alpha: 0.4),
                                         width: 1 * scale,
@@ -1177,7 +1173,7 @@ class _ClosetSheetState extends State<_ClosetSheet> {
                                         ),
                                       ),
                                     ),
-                                  if (unlocked && _selectedIndex == originalIndex)
+                                  if (unlocked && _selectedIndex == index)
                                     Positioned(
                                       left: 8 * scale,
                                       right: 8 * scale,
@@ -1187,17 +1183,17 @@ class _ClosetSheetState extends State<_ClosetSheet> {
                                         child: ElevatedButton(
                                           onPressed: () {
                                             setState(() {
-                                              if (_appliedConjunto == originalIndex) {
+                                              if (_appliedConjunto == index) {
                                                 _appliedConjunto = null;
-                                                widget.onRemove?.call(originalIndex);
+                                                widget.onRemove?.call();
                                                 return;
                                               }
-                                              _appliedConjunto = originalIndex;
-                                              widget.onApply?.call(originalIndex);
+                                              _appliedConjunto = index;
+                                              widget.onApply?.call(originalIndex, index);
                                             });
                                           },
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: _appliedConjunto == originalIndex
+                                            backgroundColor: _appliedConjunto == index
                                                 ? Colors.white
                                                 : AppColors.mintPrimary,
                                             shape: RoundedRectangleBorder(
@@ -1206,9 +1202,9 @@ class _ClosetSheetState extends State<_ClosetSheet> {
                                             elevation: 2 * scale,
                                           ),
                                           child: Text(
-                                            _appliedConjunto == originalIndex ? 'Quitar' : 'Aplicar',
+                                            _appliedConjunto == index ? 'Quitar' : 'Aplicar',
                                             style: TextStyle(
-                                              color: _appliedConjunto == originalIndex ? AppColors.textPrimary : Colors.white,
+                                              color: _appliedConjunto == index ? AppColors.textPrimary : Colors.white,
                                               fontWeight: FontWeight.w700,
                                             ),
                                           ),

@@ -275,4 +275,32 @@ class ApiClient {
       throw Exception('Error al actualizar ropa: ${response.statusCode}');
     }
   }
+
+  /// Equipa un conjunto por su posicion visual en el closet.
+  Future<Map<String, dynamic>> updateClothingSlotEquipped(int slot, bool estaEquipado) async {
+    final response = await post(
+      '/pet/clothing/equip',
+      body: {'slot': slot, 'estaEquipado': estaEquipado},
+      needsAuth: true,
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Error al actualizar conjunto: ${response.statusCode}');
+    }
+  }
+
+  /// Equipa una prenda por nombre logico, por ejemplo "vacio".
+  Future<Map<String, dynamic>> updateClothingNameEquipped(String nombreRopa, bool estaEquipado) async {
+    final response = await post(
+      '/pet/clothing/equip',
+      body: {'nombreRopa': nombreRopa, 'estaEquipado': estaEquipado},
+      needsAuth: true,
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Error al actualizar ropa: ${response.statusCode}');
+    }
+  }
 }

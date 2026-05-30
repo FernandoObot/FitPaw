@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_colors.dart';
+import '../../services/api_client.dart';
+import '../../services/workout_schedule_service.dart';
 import '../widgets/responsive.dart';
 
 class ActivityHistoryScreen extends StatefulWidget {
@@ -11,21 +13,74 @@ class ActivityHistoryScreen extends StatefulWidget {
 }
 
 class _ActivityHistoryScreenState extends State<ActivityHistoryScreen> {
+  final WorkoutScheduleService _scheduleService = WorkoutScheduleService(ApiClient());
   int _selectedActivityIndex = 0;
   bool _animateBars = false;
+  bool _isLoading = true;
+  String? _errorMessage;
 
-  final List<double> _weekValues = [0.35, 0.72, 0.48, 0.62, 0.85, 0.38, 0.68];
+  final List<int> _weekCounts = List<int>.filled(7, 0);
+  final List<_RecentActivity> _recentActivities = [];
   final List<String> _weekLabels = ['Lun', 'Mar', 'Mierc', 'Juev', 'Vier', 'Sab', 'Dom'];
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() => _animateBars = true);
+    _loadActivityHistory();
+  }
+
+  Future<void> _loadActivityHistory() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _animateBars = false;
     });
+
+    final today = DateTime.now();
+    final monday = DateTime(today.year, today.month, today.day).subtract(Duration(days: today.weekday - 1));
+    final nextCounts = List<int>.filled(7, 0);
+    final nextRecent = <_RecentActivity>[];
+
+    try {
+      for (int index = 0; index < 7; index++) {
+        final date = monday.add(Duration(days: index));
+        final exercises = await _scheduleService.loadExercisesForDate(fecha: date);
+        final completed = exercises.where((exercise) => exercise['completado'] == true).toList();
+        nextCounts[index] = completed.length.clamp(0, 4);
+
+        for (final exercise in completed) {
+          nextRecent.add(_RecentActivity.fromExercise(exercise, date));
+        }
+      }
+
+      nextRecent.sort((a, b) {
+        final byDate = b.date.compareTo(a.date);
+        if (byDate != 0) return byDate;
+        return b.hour.compareTo(a.hour);
+      });
+
+      if (!mounted) return;
+      setState(() {
+        for (int i = 0; i < _weekCounts.length; i++) {
+          _weekCounts[i] = nextCounts[i];
+        }
+        _recentActivities
+          ..clear()
+          ..addAll(nextRecent.take(8));
+        _isLoading = false;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _animateBars = true);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'No se pudo cargar el historial';
+      });
+    }
   }
 
   @override
@@ -94,11 +149,16 @@ class _ActivityHistoryScreenState extends State<ActivityHistoryScreen> {
                     ],
                   ),
                   SizedBox(height: 12 * scale),
-                  _ChartCard(
-                    values: _weekValues,
-                    labels: _weekLabels,
-                    animateBars: _animateBars,
-                  ),
+                  if (_isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (_errorMessage != null)
+                    _EmptyState(message: _errorMessage!)
+                  else
+                    _ChartCard(
+                      counts: _weekCounts,
+                      labels: _weekLabels,
+                      animateBars: _animateBars,
+                    ),
                   SizedBox(height: 18 * scale),
                   Row(
                     children: [
@@ -115,21 +175,23 @@ class _ActivityHistoryScreenState extends State<ActivityHistoryScreen> {
                     ],
                   ),
                   SizedBox(height: 12 * scale),
-                  _ActivityTile(
-                    title: 'Programa de cardio',
-                    subtitle: 'Hace 3 minutos',
-                    icon: Icons.favorite_rounded,
-                    isSelected: _selectedActivityIndex == 0,
-                    onTap: () => setState(() => _selectedActivityIndex = 0),
-                  ),
-                  SizedBox(height: 12 * scale),
-                  _ActivityTile(
-                    title: 'Programa de cuerpo bajo',
-                    subtitle: 'Hace 1 hora',
-                    icon: Icons.fitness_center_rounded,
-                    isSelected: _selectedActivityIndex == 1,
-                    onTap: () => setState(() => _selectedActivityIndex = 1),
-                  ),
+                  if (!_isLoading && _recentActivities.isEmpty)
+                    const _EmptyState(message: 'Aun no hay ejercicios completados esta semana')
+                  else
+                    ...List.generate(_recentActivities.length, (index) {
+                      final activity = _recentActivities[index];
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 12 * scale),
+                        child: _ActivityTile(
+                          title: activity.title,
+                          subtitle: activity.subtitle,
+                          icon: activity.icon,
+                          detail: activity.detail,
+                          isSelected: _selectedActivityIndex == index,
+                          onTap: () => setState(() => _selectedActivityIndex = index),
+                        ),
+                      );
+                    }),
                 ],
               ),
             ),
@@ -142,12 +204,12 @@ class _ActivityHistoryScreenState extends State<ActivityHistoryScreen> {
 
 class _ChartCard extends StatelessWidget {
   const _ChartCard({
-    required this.values,
+    required this.counts,
     required this.labels,
     required this.animateBars,
   });
 
-  final List<double> values;
+  final List<int> counts;
   final List<String> labels;
   final bool animateBars;
 
@@ -169,18 +231,53 @@ class _ChartCard extends StatelessWidget {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4 * scale),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '4',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: Responsive.fs(context, 10),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  'Ejercicios completados por dia',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: Responsive.fs(context, 10),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
           SizedBox(
             height: 140 * scale,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(values.length, (index) {
-                final double targetHeight = 100 * scale * values[index];
+              children: List.generate(counts.length, (index) {
+                final int count = counts[index].clamp(0, 4);
+                final double targetHeight = (12 + (88 * (count / 4))) * scale;
                 return Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      Text(
+                        '$count',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: Responsive.fs(context, 10),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 6 * scale),
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 600),
                         curve: Curves.easeOutCubic,
@@ -206,6 +303,17 @@ class _ChartCard extends StatelessWidget {
               }),
             ),
           ),
+          Padding(
+            padding: EdgeInsets.only(left: 4 * scale),
+            child: Text(
+              '0',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: Responsive.fs(context, 10),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -217,6 +325,7 @@ class _ActivityTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
+    required this.detail,
     required this.isSelected,
     required this.onTap,
   });
@@ -224,6 +333,7 @@ class _ActivityTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+  final String detail;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -278,6 +388,19 @@ class _ActivityTile extends StatelessWidget {
                         fontSize: Responsive.fs(context, 11),
                       ),
                     ),
+                    if (detail.isNotEmpty) ...[
+                      SizedBox(height: 3 * scale),
+                      Text(
+                        detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: Responsive.fs(context, 10),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -286,5 +409,96 @@ class _ActivityTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final double scale = Responsive.scale(context);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(18 * scale),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18 * scale),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: Responsive.fs(context, 12),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentActivity {
+  const _RecentActivity({
+    required this.title,
+    required this.subtitle,
+    required this.detail,
+    required this.icon,
+    required this.date,
+    required this.hour,
+  });
+
+  final String title;
+  final String subtitle;
+  final String detail;
+  final IconData icon;
+  final DateTime date;
+  final int hour;
+
+  factory _RecentActivity.fromExercise(Map<String, dynamic> exercise, DateTime date) {
+    final String title = (exercise['nombre'] as String?) ?? 'Ejercicio';
+    final String tipo = (exercise['tipo'] as String?) ?? '';
+    final int hour = exercise['hora'] is num ? (exercise['hora'] as num).toInt() : 0;
+    final String subtitle = '${_dayLabel(date)} · ${_hourLabel(hour)}';
+    final String detail = _detailFor(exercise);
+    final IconData icon = tipo == 'cardio' ? Icons.favorite_rounded : Icons.fitness_center_rounded;
+
+    return _RecentActivity(
+      title: title,
+      subtitle: subtitle,
+      detail: detail,
+      icon: icon,
+      date: date,
+      hour: hour,
+    );
+  }
+
+  static String _detailFor(Map<String, dynamic> exercise) {
+    final String tipo = (exercise['tipo'] as String?) ?? '';
+    if (tipo == 'cardio') {
+      final minutos = exercise['tiempo_minutos'];
+      return minutos == null ? 'Cardio completado' : '$minutos minutos';
+    }
+
+    final reps = exercise['repeticiones'];
+    final peso = exercise['peso'];
+    final parts = <String>[];
+    if (reps != null) parts.add('$reps reps');
+    if (peso != null) parts.add('$peso kg');
+    return parts.isEmpty ? 'Fuerza completada' : parts.join(', ');
+  }
+
+  static String _dayLabel(DateTime date) {
+    const names = ['Lun', 'Mar', 'Mierc', 'Juev', 'Vier', 'Sab', 'Dom'];
+    return names[date.weekday - 1];
+  }
+
+  static String _hourLabel(int hour) {
+    if (hour <= 0) return 'Sin hora';
+    final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+    final period = hour >= 12 ? 'PM' : 'AM';
+    return '$hour12:00 $period';
   }
 }

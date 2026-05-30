@@ -10,6 +10,7 @@ import java.time.ZoneId;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.fitpaw.backend.DTOs.FeedRequest;
@@ -32,6 +33,8 @@ public class PetService {
 
     public PetStatusResponse getPetStatus(int usuarioId) {
         try (Connection conn = conexionDB.conectar()) {
+            persistHungerDecayForUser(conn, usuarioId);
+
             // 🔑 SELECT solo con campos que existen en BD
             String sql = "SELECT mascota_id, nombre, hambre, ultima_vez_alimentado FROM public.mascota_estado WHERE usuario_id = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -62,6 +65,27 @@ public class PetService {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Error al obtener estado de mascota: " + e.getMessage());
+        }
+    }
+
+    @Scheduled(fixedRateString = "${pet.hunger.scheduler-rate-ms:1000}")
+    public void persistHungerDecayForAllPets() {
+        try (Connection conn = conexionDB.conectar()) {
+            java.util.List<Integer> usuarios = new java.util.ArrayList<>();
+            String sql = "SELECT usuario_id, hambre, ultima_vez_alimentado "
+                    + "FROM public.mascota_estado "
+                    + "WHERE ultima_vez_alimentado IS NOT NULL AND COALESCE(hambre, 100) > 0";
+            try (PreparedStatement ps = conn.prepareStatement(sql);
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    usuarios.add(rs.getInt("usuario_id"));
+                }
+            }
+            for (Integer usuarioId : usuarios) {
+                persistHungerDecayForUser(conn, usuarioId);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al actualizar hambre programada: " + e.getMessage());
         }
     }
 
@@ -176,6 +200,32 @@ public class PetService {
         if (cur > 100) cur = 100;
         if (cur < 0) cur = 0;
         return (int) cur;
+    }
+
+    private void persistHungerDecayForUser(Connection conn, int usuarioId) throws SQLException {
+        String selectSql = "SELECT hambre, ultima_vez_alimentado FROM public.mascota_estado WHERE usuario_id = ? FOR UPDATE";
+        try (PreparedStatement ps = conn.prepareStatement(selectSql)) {
+            ps.setInt(1, usuarioId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return;
+                }
+
+                int storedHunger = rs.getObject("hambre") != null ? rs.getInt("hambre") : 100;
+                Timestamp last = rs.getTimestamp("ultima_vez_alimentado");
+                int currentHunger = computeHunger(storedHunger, last);
+
+                if (currentHunger != storedHunger) {
+                    String updateSql = "UPDATE public.mascota_estado SET hambre = ?, ultima_vez_alimentado = ? WHERE usuario_id = ?";
+                    try (PreparedStatement update = conn.prepareStatement(updateSql)) {
+                        update.setInt(1, currentHunger);
+                        update.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now(ZoneId.systemDefault())));
+                        update.setInt(3, usuarioId);
+                        update.executeUpdate();
+                    }
+                }
+            }
+        }
     }
 
     private int mapItemToPoints(String key) {
@@ -356,5 +406,71 @@ public class PetService {
         } catch (SQLException e) {
             throw new IllegalStateException("Error al actualizar ropa: " + e.getMessage());
         }
+    }
+
+    public void updateClothingSlotEquipped(int usuarioId, int slot, boolean estaEquipado) {
+        try (Connection conn = conexionDB.conectar()) {
+            int ropaId = resolveClothingSlotId(conn, usuarioId, slot);
+            updateClothingEquipped(usuarioId, ropaId, estaEquipado);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al actualizar conjunto: " + e.getMessage());
+        }
+    }
+
+    public void updateClothingByName(int usuarioId, String nombreRopa, boolean estaEquipado) {
+        try (Connection conn = conexionDB.conectar()) {
+            int ropaId = resolveClothingByNameId(conn, usuarioId, nombreRopa);
+            updateClothingEquipped(usuarioId, ropaId, estaEquipado);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al actualizar ropa: " + e.getMessage());
+        }
+    }
+
+    private int resolveClothingSlotId(Connection conn, int usuarioId, int slot) throws SQLException {
+        String condition;
+        if (slot == 0) {
+            condition = "(LOWER(nombre_ropa) = 'conjunto 1' OR LOWER(nombre_ropa) LIKE '%verde%' OR LOWER(nombre_ropa) LIKE '%celeste%')";
+        } else if (slot == 1) {
+            condition = "(LOWER(nombre_ropa) = 'conjunto 2' OR LOWER(nombre_ropa) LIKE '%morada%' OR LOWER(nombre_ropa) LIKE '%morado%' OR LOWER(nombre_ropa) LIKE '%rosa%')";
+        } else {
+            throw new IllegalArgumentException("Solo los conjuntos 1 y 2 se pueden equipar por racha");
+        }
+
+        String sql = "SELECT ropa_id FROM public.mascota_ropa "
+                + "WHERE mascota_id = (SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ?) "
+                + "AND " + condition + " "
+                + "ORDER BY CASE "
+                + "WHEN LOWER(nombre_ropa) = ? THEN 0 "
+                + "WHEN LOWER(nombre_ropa) LIKE ? THEN 1 "
+                + "ELSE 2 END, ropa_id "
+                + "LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, usuarioId);
+            ps.setString(2, slot == 0 ? "conjunto 1" : "conjunto 2");
+            ps.setString(3, slot == 0 ? "%verde%" : "%morada%");
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("ropa_id");
+                }
+            }
+        }
+        throw new IllegalStateException(slot == 0 ? "Conjunto 1 verde no desbloqueado" : "Conjunto 2 morado no desbloqueado");
+    }
+
+    private int resolveClothingByNameId(Connection conn, int usuarioId, String nombreRopa) throws SQLException {
+        String sql = "SELECT ropa_id FROM public.mascota_ropa "
+                + "WHERE mascota_id = (SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ?) "
+                + "AND LOWER(nombre_ropa) = LOWER(?) "
+                + "ORDER BY ropa_id LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, usuarioId);
+            ps.setString(2, nombreRopa);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("ropa_id");
+                }
+            }
+        }
+        throw new IllegalStateException("Ropa no encontrada para el usuario: " + nombreRopa);
     }
 }

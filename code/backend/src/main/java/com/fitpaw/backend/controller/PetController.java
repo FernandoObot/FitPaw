@@ -83,13 +83,30 @@ public class PetController {
     @PostMapping("/clothing/equip")
     public ResponseEntity<?> equipClothing(@RequestBody java.util.Map<String, Object> request) {
         int usuarioId = getUsuarioIdFromAuth();
-        Integer ropaId = ((Number) request.get("ropaId")).intValue();
         Boolean estaEquipado = (Boolean) request.get("estaEquipado");
         
-        if (ropaId == null || estaEquipado == null) {
-            return ResponseEntity.badRequest().body("Los campos 'ropaId' y 'estaEquipado' son obligatorios");
+        if (estaEquipado == null) {
+            return ResponseEntity.badRequest().body("El campo 'estaEquipado' es obligatorio");
+        }
+
+        Object slotValue = request.get("slot");
+        if (slotValue instanceof Number) {
+            petService.updateClothingSlotEquipped(usuarioId, ((Number) slotValue).intValue(), estaEquipado);
+            return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Conjunto actualizado"));
+        }
+
+        Object nombreValue = request.get("nombreRopa");
+        if (nombreValue instanceof String && !((String) nombreValue).isBlank()) {
+            petService.updateClothingByName(usuarioId, (String) nombreValue, estaEquipado);
+            return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Ropa actualizada"));
+        }
+
+        Object ropaIdValue = request.get("ropaId");
+        if (!(ropaIdValue instanceof Number)) {
+            return ResponseEntity.badRequest().body("Debes enviar 'ropaId', 'slot' o 'nombreRopa'");
         }
         
+        Integer ropaId = ((Number) ropaIdValue).intValue();
         petService.updateClothingEquipped(usuarioId, ropaId, estaEquipado);
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Ropa actualizada"));
     }

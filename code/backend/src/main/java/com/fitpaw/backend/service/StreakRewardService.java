@@ -315,13 +315,12 @@ public class StreakRewardService {
 
     /**
      * Crea los atuendos desbloqueados a los 30 días
-     * Los 5 prendas disponibles son: Conjunto 1, 2, 3, 4, 5
+     * Los 5 espacios existen en frontend, pero esta recompensa solo desbloquea los primeros 2.
      * Al registrarse, solo "vacio" se crea
-     * A los 30 días, se desbloquean Conjunto 1, 2, 3, 4, 5
+     * A los 30 días, se desbloquean Conjunto 1 y Conjunto 2
      */
     private java.util.List<String> crearAtuendosDesbloqueados(Connection conn, int mascotaId) throws SQLException {
-        // Estos son los 5 prendas que se muestran en el frontend
-        String[] atuendos = {"Conjunto 1", "Conjunto 2", "Conjunto 3", "Conjunto 4", "Conjunto 5"};
+        String[] atuendos = {"Conjunto 1", "Conjunto 2"};
         java.util.List<String> nuevos = new java.util.ArrayList<>();
         
         for (String atuendo : atuendos) {
