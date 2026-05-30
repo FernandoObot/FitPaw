@@ -15,12 +15,12 @@ import org.springframework.stereotype.Service;
 
 import com.fitpaw.backend.DTOs.FeedRequest;
 import com.fitpaw.backend.DTOs.PetStatusResponse;
-import com.fitpaw.backend.repository.ConexionDB;
+import com.fitpaw.backend.repository.DatabaseConnectionProvider;
 
 @Service
-public class PetService {
+public class PetService implements PetUseCase {
 
-    private final ConexionDB conexionDB;
+    private final DatabaseConnectionProvider conexionDB;
     private final StreakRewardService streakRewardService;
 
     @Value("${pet.hunger.decrease-ms-per-step:${pet.hunger.decrease-ms-per-point:300000}}")
@@ -29,7 +29,7 @@ public class PetService {
     @Value("${pet.hunger.points-per-step:25}")
     private int decreasePointsPerStep;
 
-    public PetService(ConexionDB conexionDB, StreakRewardService streakRewardService) {
+    public PetService(DatabaseConnectionProvider conexionDB, StreakRewardService streakRewardService) {
         this.conexionDB = conexionDB;
         this.streakRewardService = streakRewardService;
     }
@@ -172,14 +172,12 @@ public class PetService {
                         // create a new mascota_estado row for user
                         Timestamp now = Timestamp.valueOf(LocalDateTime.now(ZoneId.systemDefault()));
                         int newHunger = 100;
-                        String insert = "INSERT INTO public.mascota_estado (usuario_id, nombre, nivel, experiencia_actual, hambre, ultima_vez_alimentado) VALUES (?, ?, ?, ?, ?, ?)";
+                        String insert = "INSERT INTO public.mascota_estado (usuario_id, nombre, hambre, ultima_vez_alimentado) VALUES (?, ?, ?, ?)";
                         try (PreparedStatement ins = conn.prepareStatement(insert)) {
                             ins.setInt(1, usuarioId);
                             ins.setString(2, "Mascota FitPaw");
-                            ins.setInt(3, 1);
-                            ins.setInt(4, 0);
-                            ins.setInt(5, newHunger);
-                            ins.setTimestamp(6, now);
+                            ins.setInt(3, newHunger);
+                            ins.setTimestamp(4, now);
                             ins.executeUpdate();
                         }
                         PetStatusResponse resp = getPetStatus(usuarioId);
@@ -311,32 +309,6 @@ public class PetService {
             return getPetStatus(usuarioId);
         } catch (SQLException e) {
             throw new IllegalStateException("Error al actualizar nombre de mascota: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Establece el nivel de hambre de la mascota
-     */
-    public PetStatusResponse setHungerLevel(int usuarioId, int nuevoHambre) {
-        if (nuevoHambre < 0 || nuevoHambre > 100) {
-            throw new IllegalArgumentException("El hambre debe estar entre 0 y 100");
-        }
-
-        try (Connection conn = conexionDB.conectar()) {
-            String sql = "UPDATE public.mascota_estado SET hambre = ?, ultima_vez_alimentado = ? WHERE usuario_id = ?";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, nuevoHambre);
-                ps.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
-                ps.setInt(3, usuarioId);
-                int updated = ps.executeUpdate();
-                if (updated == 0) {
-                    throw new IllegalStateException("Mascota no encontrada para el usuario");
-                }
-            }
-
-            return getPetStatus(usuarioId);
-        } catch (SQLException e) {
-            throw new IllegalStateException("Error al actualizar hambre de mascota: " + e.getMessage());
         }
     }
 

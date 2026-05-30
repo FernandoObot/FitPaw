@@ -3,9 +3,7 @@ package com.fitpaw.backend.service;
 import com.fitpaw.backend.DTOs.SaveCardioExerciseRequest;
 import com.fitpaw.backend.DTOs.ExerciseCompletionResponse;
 import com.fitpaw.backend.DTOs.SaveFuerzaExerciseRequest;
-import com.fitpaw.backend.repository.ConexionDB;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
+import com.fitpaw.backend.repository.DatabaseConnectionProvider;
 import org.springframework.stereotype.Service;
 
 import java.sql.Connection;
@@ -20,13 +18,15 @@ import java.util.Map;
 import java.time.LocalDate;
 
 @Service
-public class ExerciseService {
+public class ExerciseService implements ExerciseUseCase {
 
-    @Autowired
-    private ConexionDB conexionDB;
+    private final DatabaseConnectionProvider conexionDB;
+    private final StreakRewardService streakRewardService;
 
-    @Autowired
-    private StreakRewardService streakRewardService;
+    public ExerciseService(DatabaseConnectionProvider conexionDB, StreakRewardService streakRewardService) {
+        this.conexionDB = conexionDB;
+        this.streakRewardService = streakRewardService;
+    }
 
     /**
      * Guardar ejercicio cardio

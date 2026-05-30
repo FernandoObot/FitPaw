@@ -7,23 +7,21 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fitpaw.backend.DTOs.OperacionResponse;
 import com.fitpaw.backend.DTOs.RachaResponse;
-import com.fitpaw.backend.DTOs.RecompensaRachaResponse;
-import com.fitpaw.backend.service.StreakService;
+import com.fitpaw.backend.service.StreakQueryUseCase;
 
 @RestController
 @RequestMapping("/streak")
 public class StreakController {
 
-    private final StreakService streakService;
+    private final StreakQueryUseCase streakService;
 
-    public StreakController(StreakService streakService) {
+    public StreakController(StreakQueryUseCase streakService) {
         this.streakService = streakService;
     }
 
@@ -47,24 +45,6 @@ public class StreakController {
         }
         final int id = resolvedUsuarioId;
         return run(() -> streakService.obtenerRachaInfo(id), HttpStatus.OK);
-    }
-
-    /**
-     * POST /streak/check?usuarioId={id}
-     * Verifica y actualiza la racha basada en actividad registrada
-     */
-    @PostMapping("/check")
-    public ResponseEntity<?> verificarYActualizarRacha(@RequestParam(value = "usuarioId") int usuarioId) {
-        return run(() -> streakService.verificarYActualizarRacha(usuarioId), HttpStatus.OK);
-    }
-
-    /**
-     * GET /streak/rewards?usuarioId={id}
-     * Calcula y retorna las recompensas del día
-     */
-    @GetMapping("/rewards")
-    public ResponseEntity<?> obtenerRecompensas(@RequestParam(value = "usuarioId") int usuarioId) {
-        return run(() -> streakService.calcularRecompensas(usuarioId), HttpStatus.OK);
     }
 
     // ==================== MÉTODO AUXILIAR ====================

@@ -2,8 +2,8 @@ package com.fitpaw.backend.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -12,15 +12,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.fitpaw.backend.DTOs.FeedRequest;
 import com.fitpaw.backend.DTOs.PetStatusResponse;
-import com.fitpaw.backend.service.PetService;
+import com.fitpaw.backend.service.PetUseCase;
 
 @RestController
 @RequestMapping("/pet")
 public class PetController {
 
-    private final PetService petService;
+    private final PetUseCase petService;
 
-    public PetController(PetService petService) {
+    public PetController(PetUseCase petService) {
         this.petService = petService;
     }
 
@@ -59,17 +59,6 @@ public class PetController {
         int usuarioId = getUsuarioIdFromAuth();
         String nuevoNombre = request.get("nombre");
         PetStatusResponse resp = petService.updatePetName(usuarioId, nuevoNombre);
-        return ResponseEntity.ok(resp);
-    }
-
-    @PostMapping("/hunger-decrease")
-    public ResponseEntity<?> decreaseHunger(@RequestBody java.util.Map<String, Integer> request) {
-        int usuarioId = getUsuarioIdFromAuth();
-        Integer newHunger = request.get("cantidad");
-        if (newHunger == null) {
-            return ResponseEntity.badRequest().body("El campo 'cantidad' es obligatorio");
-        }
-        PetStatusResponse resp = petService.setHungerLevel(usuarioId, newHunger);
         return ResponseEntity.ok(resp);
     }
 

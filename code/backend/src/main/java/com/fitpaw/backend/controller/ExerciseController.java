@@ -3,8 +3,7 @@ package com.fitpaw.backend.controller;
 import com.fitpaw.backend.DTOs.SaveCardioExerciseRequest;
 import com.fitpaw.backend.DTOs.SaveFuerzaExerciseRequest;
 import com.fitpaw.backend.DTOs.ExerciseCompletionResponse;
-import com.fitpaw.backend.service.ExerciseService;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.fitpaw.backend.service.ExerciseUseCase;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -19,8 +18,11 @@ import java.time.LocalDate;
 @RequestMapping({"/ejercicios", "/api/ejercicios"})
 public class ExerciseController {
 
-    @Autowired
-    private ExerciseService exerciseService;
+    private final ExerciseUseCase exerciseService;
+
+    public ExerciseController(ExerciseUseCase exerciseService) {
+        this.exerciseService = exerciseService;
+    }
 
     /**
      * Guardar ejercicio cardio

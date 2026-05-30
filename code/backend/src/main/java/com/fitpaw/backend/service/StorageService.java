@@ -25,16 +25,16 @@ import org.springframework.web.server.ResponseStatusException;
 import com.fitpaw.backend.DTOs.DailyProgressPhotosResponse;
 import com.fitpaw.backend.DTOs.PhotoSlotResponse;
 import com.fitpaw.backend.DTOs.ProgressPhotoResponse;
-import com.fitpaw.backend.repository.ConexionDB;
+import com.fitpaw.backend.repository.DatabaseConnectionProvider;
 
 @Service
-public class StorageService {
+public class StorageService implements ProgressPhotoUseCase {
 
     private static final int DAILY_LIMIT = 3;
 
-    private final ConexionDB conexionDB;
+    private final DatabaseConnectionProvider conexionDB;
 
-    public StorageService(ConexionDB conexionDB) {
+    public StorageService(DatabaseConnectionProvider conexionDB) {
         this.conexionDB = conexionDB;
     }
 
@@ -378,11 +378,4 @@ public class StorageService {
         return null;
     }
 
-    public String subirFotoProgreso(int usuarioId, String rutaFoto) {
-        throw new UnsupportedOperationException("Usa subirFotoProgreso con MultipartFile desde el controlador");
-    }
-
-    public String subirFoto(int usuarioId, String rutaFoto) {
-        throw new UnsupportedOperationException("Usa subirFotoProgreso con MultipartFile desde el controlador");
-    }
 }

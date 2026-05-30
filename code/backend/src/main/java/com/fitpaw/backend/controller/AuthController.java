@@ -17,7 +17,7 @@ import com.fitpaw.backend.DTOs.RegisterRequest;
 import com.fitpaw.backend.DTOs.RegisterResponse;
 import com.fitpaw.backend.DTOs.UpdateProfileRequest;
 import com.fitpaw.backend.DTOs.EditProfileRequest;
-import com.fitpaw.backend.service.AuthService;
+import com.fitpaw.backend.service.AuthUseCase;
 import com.fitpaw.backend.DTOs.LoginRequest;
 import com.fitpaw.backend.DTOs.TokenResponse;
 
@@ -25,9 +25,9 @@ import com.fitpaw.backend.DTOs.TokenResponse;
 @RequestMapping("/auth")
 public class AuthController {
 
-    private final AuthService authService;
+    private final AuthUseCase authService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthUseCase authService) {
         this.authService = authService;
     }
 

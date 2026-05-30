@@ -20,15 +20,15 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.fitpaw.backend.DTOs.DailyProgressPhotosResponse;
 import com.fitpaw.backend.DTOs.ProgressPhotoResponse;
-import com.fitpaw.backend.service.StorageService;
+import com.fitpaw.backend.service.ProgressPhotoUseCase;
 
 @RestController
 @RequestMapping("/fotos-progreso")
 public class ProgressPhotoController {
 
-    private final StorageService storageService;
+    private final ProgressPhotoUseCase storageService;
 
-    public ProgressPhotoController(StorageService storageService) {
+    public ProgressPhotoController(ProgressPhotoUseCase storageService) {
         this.storageService = storageService;
     }
 

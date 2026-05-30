@@ -1,7 +1,5 @@
 package com.fitpaw.backend.service;
 
-import com.fitpaw.backend.repository.ConexionDB;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.sql.Connection;
@@ -13,9 +11,8 @@ import java.time.LocalDate;
 
 @Service
 public class StreakRewardService {
-
-    @Autowired
-    private ConexionDB conexionDB;
+    private static final String ORDEN_RACHA_ACTUAL =
+            "ORDER BY CASE WHEN cantidad_dias > 0 THEN 0 ELSE 1 END, fecha_ultima_actividad DESC, racha_id DESC LIMIT 1";
 
     /**
      * Obtiene la mascota del usuario para asignar recompensas
@@ -45,7 +42,8 @@ public class StreakRewardService {
         
         try {
             // Obtener la racha actual
-            String sqlObtener = "SELECT racha_id, cantidad_dias, fecha_ultima_actividad, activa FROM public.usuarios_racha WHERE usuario_id = ? ORDER BY racha_id DESC LIMIT 1";
+            String sqlObtener = "SELECT racha_id, cantidad_dias, fecha_ultima_actividad, activa FROM public.usuarios_racha WHERE usuario_id = ? "
+                    + ORDEN_RACHA_ACTUAL;
             
             try (PreparedStatement ps = conn.prepareStatement(sqlObtener)) {
                 ps.setInt(1, usuarioId);
@@ -66,9 +64,18 @@ public class StreakRewardService {
                     System.out.println("📊 Racha actual - ID: " + rachaId + ", Días: " + cantidadDias + 
                         ", Última actividad: " + fechaUltimaActividad + ", Activa: " + activa);
 
+                    if (cantidadDias <= 0) {
+                        System.out.println("🆕 Activando racha desde 0 en el primer ejercicio del día");
+                        actualizarRacha(conn, rachaId, 1, fechaHoy, true);
+                        return true;
+                    }
+
                     // Verificar si ya hay actividad hoy
                     if (fechaUltimaActividad != null && fechaUltimaActividad.equals(fechaHoy)) {
                         // Ya hay actividad hoy, no es el primer ejercicio
+                        if (!activa) {
+                            actualizarRacha(conn, rachaId, cantidadDias, fechaHoy, true);
+                        }
                         System.out.println("⏭️ Ya hay actividad hoy, no es primer ejercicio");
                         return false;
                     }
@@ -140,7 +147,7 @@ public class StreakRewardService {
      * Obtiene la cantidad actual de días de racha
      */
     public int obtenerDiasRachaActual(Connection conn, int usuarioId) throws SQLException {
-        String sql = "SELECT cantidad_dias FROM public.usuarios_racha WHERE usuario_id = ? ORDER BY racha_id DESC LIMIT 1";
+        String sql = "SELECT cantidad_dias FROM public.usuarios_racha WHERE usuario_id = ? " + ORDEN_RACHA_ACTUAL;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, usuarioId);
             try (ResultSet rs = ps.executeQuery()) {
@@ -293,7 +300,7 @@ public class StreakRewardService {
      * Verifica si se alcanzó racha de 30 días y desbloquea atuendos
      */
     public java.util.List<String> verificarDesbloqueoAtuendos30Dias(Connection conn, int usuarioId) throws SQLException {
-        String sqlObtenerRacha = "SELECT cantidad_dias FROM public.usuarios_racha WHERE usuario_id = ? ORDER BY racha_id DESC LIMIT 1";
+        String sqlObtenerRacha = "SELECT cantidad_dias FROM public.usuarios_racha WHERE usuario_id = ? " + ORDEN_RACHA_ACTUAL;
         
         try (PreparedStatement ps = conn.prepareStatement(sqlObtenerRacha)) {
             ps.setInt(1, usuarioId);

@@ -23,31 +23,28 @@ import com.fitpaw.backend.DTOs.RegisterResponse;
 import com.fitpaw.backend.DTOs.TokenResponse;
 import com.fitpaw.backend.DTOs.UpdateProfileRequest;
 import com.fitpaw.backend.DTOs.EditProfileRequest;
-import com.fitpaw.backend.repository.ConexionDB;
+import com.fitpaw.backend.repository.DatabaseConnectionProvider;
 import com.fitpaw.backend.util.JwtUtil;
 
 @Service
-public class AuthService {
+public class AuthService implements AuthUseCase {
 
     private static final Pattern PHONE_10_DIGITS = Pattern.compile("^\\d{10}$");
     private static final Pattern USERNAME = Pattern.compile("^[A-Za-zÁÉÍÓÚáéíóúÑñ]{1,16}$");
     private static final Pattern PASSWORD_LETTER = Pattern.compile(".*[A-Za-z].*");
     private static final Pattern PASSWORD_NUMBER = Pattern.compile(".*\\d.*");
 
-    private final ConexionDB conexionDB;
+    private final DatabaseConnectionProvider conexionDB;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final MascotaLogrosService mascotaLogrosService;
 
     @Value("${app.default.role:USER}")
     private String defaultRole;
 
-    public AuthService(ConexionDB conexionDB, BCryptPasswordEncoder passwordEncoder, JwtUtil jwtUtil,
-            MascotaLogrosService mascotaLogrosService) {
+    public AuthService(DatabaseConnectionProvider conexionDB, BCryptPasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
         this.conexionDB = conexionDB;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
-        this.mascotaLogrosService = mascotaLogrosService;
     }
 
     public RegisterResponse register(RegisterRequest request) {
@@ -162,7 +159,6 @@ public class AuthService {
                         int usuarioId = rs.getInt("usuario_id");
                         String hashed = rs.getString("password");
                         if (passwordEncoder.matches(password, hashed)) {
-                            mascotaLogrosService.otorgarRecompensasPrimerLogin(usuarioId);
                             try {
                                 String token = jwtUtil.generateToken(usuarioId, telefono);
                                 return new TokenResponse(token, usuarioId);

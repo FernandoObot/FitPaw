@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public class ConexionDB {
+public class ConexionDB implements DatabaseConnectionProvider {
 
     @Value("${db.HOST}")
     private String HOST;
@@ -29,6 +29,7 @@ public class ConexionDB {
     public ConexionDB() {
     }
 
+    @Override
     public Connection conectar() throws SQLException {
         String url = "jdbc:postgresql://" + HOST + ":" + PORT + "/" + DB;
         try {
