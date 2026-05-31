@@ -22,7 +22,8 @@ class HomeDashboardScreen extends StatefulWidget {
   State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
 }
 
-class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTickerProviderStateMixin {
+class _HomeDashboardScreenState extends State<HomeDashboardScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _streakController;
   late final AuthService _authService;
   String _profileName = 'Usuario';
@@ -37,6 +38,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _authService = AuthService(ApiClient());
     _streakController = AnimationController(
       vsync: this,
@@ -48,8 +50,16 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _streakController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadRachaData();
+    }
   }
 
   Future<void> _loadProfileName() async {
@@ -57,7 +67,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
     try {
       final result = await _authService.getProfile();
       debugPrint('📱 Resultado getProfile: $result');
-      
+
       if (!mounted) {
         debugPrint('📱 Widget no está mounted, cancelando actualización');
         return;
@@ -67,7 +77,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
         final data = result['data'] as Map<String, dynamic>;
         debugPrint('📱 Datos del perfil obtenidos: $data');
         final nickname = data['nickname'] as String?;
-        
+
         setState(() {
           if (nickname != null && nickname.trim().isNotEmpty) {
             _profileName = nickname;
@@ -125,12 +135,19 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: Responsive.phoneWidth(context)),
+            constraints: BoxConstraints(
+              maxWidth: Responsive.phoneWidth(context),
+            ),
             child: Column(
               children: [
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(28 * scale, 18 * scale, 28 * scale, 18 * scale),
+                    padding: EdgeInsets.fromLTRB(
+                      28 * scale,
+                      18 * scale,
+                      28 * scale,
+                      18 * scale,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -152,7 +169,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                                   AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 180),
                                     child: Text(
-                                      _loadingProfileName ? '...' : _profileName,
+                                      _loadingProfileName
+                                          ? '...'
+                                          : _profileName,
                                       key: ValueKey<String>(_profileName),
                                       style: TextStyle(
                                         color: AppColors.textPrimary,
@@ -174,17 +193,23 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                             gradient: AppColors.primaryGradient,
                             borderRadius: BorderRadius.circular(24 * scale),
                             image: const DecorationImage(
-                              image: AssetImage('assets/images/Banner-Dots.png'),
+                              image: AssetImage(
+                                'assets/images/Banner-Dots.png',
+                              ),
                               fit: BoxFit.cover,
                             ),
                           ),
-                          padding: EdgeInsets.symmetric(horizontal: 18 * scale, vertical: 16 * scale),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 18 * scale,
+                            vertical: 16 * scale,
+                          ),
                           child: Row(
                             children: [
                               AnimatedBuilder(
                                 animation: _streakController,
                                 builder: (context, child) {
-                                  final double pulse = 1 + (_streakController.value * 0.12);
+                                  final double pulse =
+                                      1 + (_streakController.value * 0.12);
                                   return Transform.scale(
                                     scale: pulse,
                                     child: Container(
@@ -192,10 +217,16 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                                       height: 58 * scale,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: Colors.white.withValues(alpha: 0.12),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.12,
+                                        ),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.white.withValues(alpha: 0.30 * _streakController.value),
+                                            color: Colors.white.withValues(
+                                              alpha:
+                                                  0.30 *
+                                                  _streakController.value,
+                                            ),
                                             blurRadius: 22 * scale,
                                             spreadRadius: 2 * scale,
                                           ),
@@ -254,18 +285,24 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                             borderRadius: BorderRadius.circular(18 * scale),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(18 * scale),
-                              onTapDown: (_) => setState(() => _isReviewPressed = true),
-                              onTapCancel: () => setState(() => _isReviewPressed = false),
+                              onTapDown: (_) =>
+                                  setState(() => _isReviewPressed = true),
+                              onTapCancel: () =>
+                                  setState(() => _isReviewPressed = false),
                               onTap: () {
                                 setState(() => _isReviewPressed = false);
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (_) => const ActivityHistoryScreen(),
+                                    builder: (_) =>
+                                        const ActivityHistoryScreen(),
                                   ),
                                 );
                               },
                               child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 18 * scale, vertical: 13 * scale),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 18 * scale,
+                                  vertical: 13 * scale,
+                                ),
                                 child: Row(
                                   children: [
                                     Expanded(
@@ -279,13 +316,22 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                                       ),
                                     ),
                                     AnimatedContainer(
-                                      duration: const Duration(milliseconds: 180),
-                                      padding: EdgeInsets.symmetric(horizontal: 18 * scale, vertical: 8 * scale),
+                                      duration: const Duration(
+                                        milliseconds: 180,
+                                      ),
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 18 * scale,
+                                        vertical: 8 * scale,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: _isReviewPressed
-                                            ? AppColors.mintPrimary.withValues(alpha: 0.85)
+                                            ? AppColors.mintPrimary.withValues(
+                                                alpha: 0.85,
+                                              )
                                             : AppColors.mintPrimary,
-                                        borderRadius: BorderRadius.circular(26 * scale),
+                                        borderRadius: BorderRadius.circular(
+                                          26 * scale,
+                                        ),
                                       ),
                                       child: Text(
                                         'Revisar',
@@ -307,7 +353,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                           index: 0,
                           selectedTaskIndex: _selectedTaskIndex,
                           pressedTaskIndex: _pressedTaskIndex,
-                          onPressedStateChanged: (pressed) => _setTaskPressedState(0, pressed),
+                          onPressedStateChanged: (pressed) =>
+                              _setTaskPressedState(0, pressed),
                           onTap: () => _selectTask(0),
                           icon: Icons.directions_run_rounded,
                           title: 'Sentadillas',
@@ -318,7 +365,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                           index: 1,
                           selectedTaskIndex: _selectedTaskIndex,
                           pressedTaskIndex: _pressedTaskIndex,
-                          onPressedStateChanged: (pressed) => _setTaskPressedState(1, pressed),
+                          onPressedStateChanged: (pressed) =>
+                              _setTaskPressedState(1, pressed),
                           onTap: () => _selectTask(1),
                           icon: Icons.fitness_center_rounded,
                           title: 'Press de hombros',
@@ -329,7 +377,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                           index: 2,
                           selectedTaskIndex: _selectedTaskIndex,
                           pressedTaskIndex: _pressedTaskIndex,
-                          onPressedStateChanged: (pressed) => _setTaskPressedState(2, pressed),
+                          onPressedStateChanged: (pressed) =>
+                              _setTaskPressedState(2, pressed),
                           onTap: () => _selectTask(2),
                           icon: Icons.accessibility_new_rounded,
                           title: 'Flexion de una pierna (con pesas)',
@@ -340,7 +389,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                           index: 3,
                           selectedTaskIndex: _selectedTaskIndex,
                           pressedTaskIndex: _pressedTaskIndex,
-                          onPressedStateChanged: (pressed) => _setTaskPressedState(3, pressed),
+                          onPressedStateChanged: (pressed) =>
+                              _setTaskPressedState(3, pressed),
                           onTap: () => _selectTask(3),
                           icon: Icons.directions_walk_rounded,
                           title: 'Correr',
@@ -354,7 +404,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                   height: 88 * scale,
                   decoration: BoxDecoration(
                     color: const Color(0xFFF4EEEF),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(24 * scale)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24 * scale),
+                    ),
                   ),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
@@ -364,7 +416,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                         behavior: HitTestBehavior.opaque,
                         onTapDown: (details) {
                           final int nextIndex =
-                              (details.localPosition.dx / segmentWidth).clamp(0, 4).floor();
+                              (details.localPosition.dx / segmentWidth)
+                                  .clamp(0, 4)
+                                  .floor();
                           if (nextIndex != _selectedBottomIndex) {
                             _handleBottomTap(nextIndex);
                           } else if (nextIndex == 4 || nextIndex == 2) {
@@ -373,7 +427,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
                         },
                         onHorizontalDragUpdate: (details) {
                           final int nextIndex =
-                              (details.localPosition.dx / segmentWidth).clamp(0, 4).floor();
+                              (details.localPosition.dx / segmentWidth)
+                                  .clamp(0, 4)
+                                  .floor();
                           if (nextIndex != _selectedBottomIndex) {
                             setState(() => _selectedBottomIndex = nextIndex);
                           }
@@ -434,17 +490,17 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
     _selectBottom(index);
 
     if (index == 1) {
-        Navigator.of(context)
-            .push(
-              MaterialPageRoute(
-                builder: (_) => TrainingScheduleScreen(
-                  exerciseTitle: 'Sentadillas',
-                  exerciseSubtitle: '3 series de 15 reps',
-                  exerciseIcon: Icons.directions_run_rounded,
-                ),
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute(
+              builder: (_) => TrainingScheduleScreen(
+                exerciseTitle: 'Sentadillas',
+                exerciseSubtitle: '3 series de 15 reps',
+                exerciseIcon: Icons.directions_run_rounded,
               ),
-            )
-            .then((_) => _selectBottom(0));
+            ),
+          )
+          .then((_) => _selectBottom(0));
     } else if (index == 2) {
       Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => const PetScreen()))
@@ -497,15 +553,28 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> with SingleTi
           .then((_) => setState(() => _selectedTaskIndex = 0));
     } else if (index == 1) {
       Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => PressHombrosScreen(selectedDate: DateTime.now())))
+          .push(
+            MaterialPageRoute(
+              builder: (_) => PressHombrosScreen(selectedDate: DateTime.now()),
+            ),
+          )
           .then((_) => setState(() => _selectedTaskIndex = 0));
     } else if (index == 2) {
       Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => FlexionUnaPiernaScreen(selectedDate: DateTime.now())))
+          .push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  FlexionUnaPiernaScreen(selectedDate: DateTime.now()),
+            ),
+          )
           .then((_) => setState(() => _selectedTaskIndex = 0));
     } else if (index == 3) {
       Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => RunningScreen(selectedDate: DateTime.now())))
+          .push(
+            MaterialPageRoute(
+              builder: (_) => RunningScreen(selectedDate: DateTime.now()),
+            ),
+          )
           .then((_) => setState(() => _selectedTaskIndex = 0));
     } else {
       Navigator.of(context).push(
@@ -565,12 +634,19 @@ class _GoalTaskTile extends StatelessWidget {
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOut,
             width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
+            padding: EdgeInsets.symmetric(
+              horizontal: 14 * scale,
+              vertical: 10 * scale,
+            ),
             decoration: BoxDecoration(
-              color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.58),
+              color: isSelected
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.58),
               borderRadius: BorderRadius.circular(16 * scale),
               border: Border.all(
-                color: isSelected ? AppColors.mintPrimary.withValues(alpha: 0.80) : const Color(0xFFECECEC),
+                color: isSelected
+                    ? AppColors.mintPrimary.withValues(alpha: 0.80)
+                    : const Color(0xFFECECEC),
                 width: isSelected ? 1.6 : 1,
               ),
               boxShadow: isSelected
@@ -591,9 +667,15 @@ class _GoalTaskTile extends StatelessWidget {
                   height: 58 * scale,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: isSelected ? const Color(0xFFCFEFE7) : const Color(0xFFD9EEE9),
+                    color: isSelected
+                        ? const Color(0xFFCFEFE7)
+                        : const Color(0xFFD9EEE9),
                   ),
-                  child: Icon(icon, color: AppColors.deepNavy, size: 28 * scale),
+                  child: Icon(
+                    icon,
+                    color: AppColors.deepNavy,
+                    size: 28 * scale,
+                  ),
                 ),
                 SizedBox(width: 14 * scale),
                 Expanded(
@@ -662,13 +744,19 @@ class _BottomBarIcon extends StatelessWidget {
               gradient: AppColors.primaryGradient,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.blueSecondary.withValues(alpha: isActive ? 0.35 : 0.20),
+                  color: AppColors.blueSecondary.withValues(
+                    alpha: isActive ? 0.35 : 0.20,
+                  ),
                   blurRadius: (isActive ? 18 : 12) * scale,
                   offset: Offset(0, 8 * scale),
                 ),
               ],
             ),
-            child: Icon(Icons.pets_rounded, color: Colors.white, size: 30 * scale),
+            child: Icon(
+              Icons.pets_rounded,
+              color: Colors.white,
+              size: 30 * scale,
+            ),
           ),
         ),
       );
@@ -679,9 +767,14 @@ class _BottomBarIcon extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 6 * scale),
+        padding: EdgeInsets.symmetric(
+          horizontal: 8 * scale,
+          vertical: 6 * scale,
+        ),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.mintPrimary.withValues(alpha: 0.16) : Colors.transparent,
+          color: isActive
+              ? AppColors.mintPrimary.withValues(alpha: 0.16)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(14 * scale),
         ),
         child: Icon(

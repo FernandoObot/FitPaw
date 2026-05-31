@@ -6,22 +6,25 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class ApiClient {
   static final String baseUrl = _getBaseUrl();
   static const String _tokenKey = 'jwt_token';
-  
+
   static String _getBaseUrl() {
-    return kIsWeb
-        ? 'http://127.0.0.1:8080'
-        : 'http://192.168.1.68:8080';
+    const configuredUrl = String.fromEnvironment('API_BASE_URL');
+    if (configuredUrl.isNotEmpty) {
+      return configuredUrl;
+    }
+
+    return kIsWeb ? 'http://127.0.0.1:8080' : 'http://10.0.2.2:8080';
   }
-  
+
   static final ApiClient _instance = ApiClient._internal();
   static String? _staticToken; // Token compartido globalmente
-  
+
   factory ApiClient() {
     return _instance;
   }
-  
+
   ApiClient._internal();
-  
+
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   String? _token;
 
@@ -29,16 +32,20 @@ class ApiClient {
     // Primero intentar cargar del token estático
     if (_staticToken != null) {
       _token = _staticToken;
-      debugPrint('✅ Token cargado del cache estático: ${_token!.substring(0, 20)}...');
+      debugPrint(
+        '✅ Token cargado del cache estático: ${_token!.substring(0, 20)}...',
+      );
       return;
     }
-    
+
     // Intentar cargar de FlutterSecureStorage
     try {
       _token = await _secureStorage.read(key: _tokenKey);
       if (_token != null) {
         _staticToken = _token; // Guardar en cache estático
-        debugPrint('✅ Token cargado de FlutterSecureStorage: ${_token!.substring(0, 20)}...');
+        debugPrint(
+          '✅ Token cargado de FlutterSecureStorage: ${_token!.substring(0, 20)}...',
+        );
       } else {
         debugPrint('⚠️ No hay token en almacenamiento');
       }
@@ -80,12 +87,12 @@ class ApiClient {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-    
+
     final token = getToken();
     if (needsAuth && token != null) {
       headers['Authorization'] = 'Bearer $token';
     }
-    
+
     return headers;
   }
 
@@ -99,34 +106,35 @@ class ApiClient {
       if (needsAuth && _token == null) {
         await loadToken();
       }
-      
-      final response = await http.post(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: _getHeaders(needsAuth: needsAuth),
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 30));
-      
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl$endpoint'),
+            headers: _getHeaders(needsAuth: needsAuth),
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+
       return response;
     } catch (e) {
       throw Exception('Error en POST $endpoint: $e');
     }
   }
 
-  Future<http.Response> get(
-    String endpoint, {
-    bool needsAuth = true,
-  }) async {
+  Future<http.Response> get(String endpoint, {bool needsAuth = true}) async {
     try {
       // Asegurar que el token esté cargado
       if (needsAuth && _token == null) {
         await loadToken();
       }
-      
-      final response = await http.get(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: _getHeaders(needsAuth: needsAuth),
-      ).timeout(const Duration(seconds: 30));
-      
+
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl$endpoint'),
+            headers: _getHeaders(needsAuth: needsAuth),
+          )
+          .timeout(const Duration(seconds: 30));
+
       return response;
     } catch (e) {
       throw Exception('Error en GET $endpoint: $e');
@@ -143,13 +151,15 @@ class ApiClient {
       if (needsAuth && _token == null) {
         await loadToken();
       }
-      
-      final response = await http.put(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: _getHeaders(needsAuth: needsAuth),
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 30));
-      
+
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl$endpoint'),
+            headers: _getHeaders(needsAuth: needsAuth),
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+
       return response;
     } catch (e) {
       throw Exception('Error en PUT $endpoint: $e');
@@ -166,34 +176,35 @@ class ApiClient {
       if (needsAuth && _token == null) {
         await loadToken();
       }
-      
-      final response = await http.patch(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: _getHeaders(needsAuth: needsAuth),
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 30));
-      
+
+      final response = await http
+          .patch(
+            Uri.parse('$baseUrl$endpoint'),
+            headers: _getHeaders(needsAuth: needsAuth),
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+
       return response;
     } catch (e) {
       throw Exception('Error en PATCH $endpoint: $e');
     }
   }
 
-  Future<http.Response> delete(
-    String endpoint, {
-    bool needsAuth = true,
-  }) async {
+  Future<http.Response> delete(String endpoint, {bool needsAuth = true}) async {
     try {
       // Asegurar que el token esté cargado
       if (needsAuth && _token == null) {
         await loadToken();
       }
-      
-      final response = await http.delete(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: _getHeaders(needsAuth: needsAuth),
-      ).timeout(const Duration(seconds: 30));
-      
+
+      final response = await http
+          .delete(
+            Uri.parse('$baseUrl$endpoint'),
+            headers: _getHeaders(needsAuth: needsAuth),
+          )
+          .timeout(const Duration(seconds: 30));
+
       return response;
     } catch (e) {
       throw Exception('Error en DELETE $endpoint: $e');
@@ -201,14 +212,16 @@ class ApiClient {
   }
 
   // ===================== MASCOTA ENDPOINTS =====================
-  
+
   /// Obtiene el estado de la mascota del usuario
   Future<Map<String, dynamic>> getPetStatus() async {
     final response = await get('/pet/status', needsAuth: true);
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
-      throw Exception('Error al obtener estado de mascota: ${response.statusCode}');
+      throw Exception(
+        'Error al obtener estado de mascota: ${response.statusCode}',
+      );
     }
   }
 
@@ -247,7 +260,9 @@ class ApiClient {
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
-      throw Exception('Error al actualizar nombre de mascota: ${response.statusCode}');
+      throw Exception(
+        'Error al actualizar nombre de mascota: ${response.statusCode}',
+      );
     }
   }
 
@@ -263,7 +278,10 @@ class ApiClient {
   }
 
   /// Actualiza el estado de equipado de una prenda
-  Future<Map<String, dynamic>> updateClothingEquipped(int ropaId, bool estaEquipado) async {
+  Future<Map<String, dynamic>> updateClothingEquipped(
+    int ropaId,
+    bool estaEquipado,
+  ) async {
     final response = await post(
       '/pet/clothing/equip',
       body: {'ropaId': ropaId, 'estaEquipado': estaEquipado},
@@ -277,7 +295,10 @@ class ApiClient {
   }
 
   /// Equipa un conjunto por su posicion visual en el closet.
-  Future<Map<String, dynamic>> updateClothingSlotEquipped(int slot, bool estaEquipado) async {
+  Future<Map<String, dynamic>> updateClothingSlotEquipped(
+    int slot,
+    bool estaEquipado,
+  ) async {
     final response = await post(
       '/pet/clothing/equip',
       body: {'slot': slot, 'estaEquipado': estaEquipado},
@@ -291,7 +312,10 @@ class ApiClient {
   }
 
   /// Equipa una prenda por nombre logico, por ejemplo "vacio".
-  Future<Map<String, dynamic>> updateClothingNameEquipped(String nombreRopa, bool estaEquipado) async {
+  Future<Map<String, dynamic>> updateClothingNameEquipped(
+    String nombreRopa,
+    bool estaEquipado,
+  ) async {
     final response = await post(
       '/pet/clothing/equip',
       body: {'nombreRopa': nombreRopa, 'estaEquipado': estaEquipado},

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:typed_data';
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -34,7 +35,50 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void initState() {
     super.initState();
+    _recoverLostCameraPhoto();
     _loadComparisonPhotos();
+  }
+
+  Future<void> _recoverLostCameraPhoto() async {
+    if (!Platform.isAndroid) {
+      return;
+    }
+
+    try {
+      final LostDataResponse response = await _imagePicker.retrieveLostData();
+      if (response.isEmpty) {
+        return;
+      }
+
+      if (response.exception != null) {
+        throw response.exception!;
+      }
+
+      final XFile? photo =
+          response.file ??
+          (response.files != null && response.files!.isNotEmpty
+              ? response.files!.first
+              : null);
+      if (photo == null) {
+        return;
+      }
+
+      final bytes = await photo.readAsBytes();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _todayPhoto = bytes;
+      });
+
+      await _uploadCapturedPhoto(photo, bytes);
+      await _loadComparisonPhotos();
+      _showMessage('Foto guardada');
+    } catch (e) {
+      debugPrint('Error recovering lost picture: $e');
+      _showMessage(_friendlyPhotoError(e));
+    }
   }
 
   Future<void> _loadComparisonPhotos() async {
@@ -119,13 +163,11 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Future<void> _takePicture() async {
     try {
-      late XFile? photo;
+      XFile? photo;
 
-      // En Android/iOS, usa la cámara
       if (Platform.isAndroid || Platform.isIOS) {
-        photo = await _imagePicker.pickImage(
-          source: ImageSource.camera,
-          preferredCameraDevice: CameraDevice.front,
+        photo = await Navigator.of(context).push<XFile>(
+          MaterialPageRoute(builder: (_) => const _InlineCameraScreen()),
         );
       } else {
         // En web y otros, aún usa image_picker pero intenta con cámara
@@ -630,6 +672,184 @@ class _CameraScreenState extends State<CameraScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineCameraScreen extends StatefulWidget {
+  const _InlineCameraScreen();
+
+  @override
+  State<_InlineCameraScreen> createState() => _InlineCameraScreenState();
+}
+
+class _InlineCameraScreenState extends State<_InlineCameraScreen> {
+  CameraController? _controller;
+  Future<void>? _initializeCameraFuture;
+  String? _errorMessage;
+  bool _isTakingPicture = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeCameraFuture = _initializeCamera();
+  }
+
+  Future<void> _initializeCamera() async {
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        throw Exception('No se encontró cámara disponible');
+      }
+
+      final selectedCamera = cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.front,
+        orElse: () => cameras.first,
+      );
+
+      final controller = CameraController(
+        selectedCamera,
+        ResolutionPreset.medium,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
+
+      _controller = controller;
+      await controller.initialize();
+    } catch (e) {
+      _errorMessage = 'No se pudo abrir la cámara';
+      rethrow;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _capture() async {
+    final controller = _controller;
+    if (controller == null ||
+        !controller.value.isInitialized ||
+        _isTakingPicture) {
+      return;
+    }
+
+    setState(() => _isTakingPicture = true);
+    try {
+      final photo = await controller.takePicture();
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(photo);
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isTakingPicture = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No se pudo tomar la foto')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double scale = Responsive.scale(context);
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: FutureBuilder<void>(
+          future: _initializeCameraFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.hasError || _controller == null) {
+              return Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24 * scale),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _errorMessage ?? 'No se pudo abrir la cámara',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: Responsive.fs(context, 16),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 18 * scale),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Volver'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: Center(child: CameraPreview(_controller!)),
+                ),
+                Positioned(
+                  left: 16 * scale,
+                  top: 12 * scale,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 28 * scale,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: _capture,
+                      child: Container(
+                        width: 78 * scale,
+                        height: 78 * scale,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 5),
+                        ),
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 140),
+                            width: _isTakingPicture ? 42 * scale : 58 * scale,
+                            height: _isTakingPicture ? 42 * scale : 58 * scale,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: _isTakingPicture
+                                ? Padding(
+                                    padding: EdgeInsets.all(10 * scale),
+                                    child: const CircularProgressIndicator(
+                                      strokeWidth: 3,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

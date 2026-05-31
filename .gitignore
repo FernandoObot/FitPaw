@@ -1,0 +1,9 @@
+# Flutter/Android generated files
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/build/
+
+# Local APK artifacts
+*.apk
+*.aab
