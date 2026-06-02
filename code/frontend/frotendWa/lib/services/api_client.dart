@@ -32,9 +32,6 @@ class ApiClient {
     // Primero intentar cargar del token estático
     if (_staticToken != null) {
       _token = _staticToken;
-      debugPrint(
-        '✅ Token cargado del cache estático: ${_token!.substring(0, 20)}...',
-      );
       return;
     }
 
@@ -43,14 +40,9 @@ class ApiClient {
       _token = await _secureStorage.read(key: _tokenKey);
       if (_token != null) {
         _staticToken = _token; // Guardar en cache estático
-        debugPrint(
-          '✅ Token cargado de FlutterSecureStorage: ${_token!.substring(0, 20)}...',
-        );
-      } else {
-        debugPrint('⚠️ No hay token en almacenamiento');
       }
     } catch (e) {
-      debugPrint('⚠️ Error al cargar token: $e');
+      debugPrint('Error al cargar token: $e');
     }
   }
 
@@ -59,9 +51,8 @@ class ApiClient {
     _staticToken = token; // Guardar en cache estático
     try {
       await _secureStorage.write(key: _tokenKey, value: token);
-      debugPrint('✅ Token guardado: ${token.substring(0, 20)}...');
     } catch (e) {
-      debugPrint('⚠️ No se pudo guardar token: $e');
+      debugPrint('No se pudo guardar token: $e');
     }
   }
 
@@ -70,9 +61,8 @@ class ApiClient {
     _staticToken = null;
     try {
       await _secureStorage.delete(key: _tokenKey);
-      debugPrint('🔐 Token limpiado');
     } catch (e) {
-      debugPrint('⚠️ Error al limpiar token: $e');
+      debugPrint('Error al limpiar token: $e');
     }
   }
 

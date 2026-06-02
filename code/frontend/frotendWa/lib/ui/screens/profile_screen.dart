@@ -523,20 +523,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    debugPrint('👤 Iniciando _loadProfile()');
     try {
       final result = await _authService.getProfile();
-      debugPrint('👤 Resultado getProfile: $result');
       if (result['success']) {
         final data = result['data'] as Map<String, dynamic>;
-        debugPrint('👤 Datos del perfil obtenidos: $data');
         if (mounted) {
           setState(() {
             // Actualizar nombre si existe
             if (data['nickname'] != null &&
                 (data['nickname'] as String).isNotEmpty) {
               _profileName = data['nickname'] as String;
-              debugPrint('✅ Nombre actualizado: $_profileName');
             }
 
             // Objetivo ya no viene del backend, mantener el valor por defecto
@@ -545,13 +541,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Actualizar estatura si existe
             if (data['estaturaCm'] != null) {
               _profileHeight = '${data['estaturaCm']} cm';
-              debugPrint('✅ Estatura actualizada: $_profileHeight');
             }
 
             // Actualizar peso si existe
             if (data['pesoActual'] != null) {
               _profileWeight = '${data['pesoActual'].toString()} kg';
-              debugPrint('✅ Peso actualizado: $_profileWeight');
             }
 
             // Calcular edad si existe fecha de nacimiento (ahora es un año como integer)
@@ -561,11 +555,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final now = DateTime.now();
                 final edad = now.year - ano;
                 _profileAge = edad.toString();
-                debugPrint(
-                  '✅ Edad calculada: $_profileAge (año nacimiento: $ano)',
-                );
               } catch (e) {
-                debugPrint('⚠️ Error al calcular edad: $e');
+                debugPrint('Error al calcular edad: $e');
               }
             }
 
@@ -579,14 +570,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _profileWeight.replaceAll(' kg', ''),
             );
             _ageController.text = _inputValue(_profileAge);
-            debugPrint('✅ Perfil completamente actualizado');
           });
         }
       } else {
-        debugPrint('❌ Error al cargar perfil: ${result['error']}');
+        debugPrint('Error al cargar perfil: ${result['error']}');
       }
     } catch (e) {
-      debugPrint('❌ Excepción al cargar perfil: $e');
+      debugPrint('Error al cargar perfil: $e');
     }
   }
 

@@ -35,10 +35,8 @@ public class ConexionDB implements DatabaseConnectionProvider {
         try {
             Class.forName("org.postgresql.Driver");
             conexion = DriverManager.getConnection(url, USER, PASSWORD);
-            System.out.println("Conectado a Supabase (FitPaw)");
         } catch (ClassNotFoundException e) {
-            System.out.println("Driver no encontrado");
-            e.printStackTrace();
+            throw new SQLException("Driver PostgreSQL no encontrado", e);
         }
         return conexion;
     }
@@ -47,10 +45,9 @@ public class ConexionDB implements DatabaseConnectionProvider {
         try {
             if (conexion != null && !conexion.isClosed()) {
                 conexion.close();
-                System.out.println("Conexión cerrada");
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("Error al cerrar conexión: " + e.getMessage());
         }
     }
 

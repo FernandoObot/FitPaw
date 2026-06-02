@@ -50,7 +50,6 @@ public class AuthService implements AuthUseCase {
     }
 
     public RegisterResponse register(RegisterRequest request) {
-        System.out.println("\n\n🔴🔴🔴 [REGISTER] INICIO DEL REGISTRO 🔴🔴🔴");
         if (request == null) {
             throw new IllegalArgumentException("El body de registro es obligatorio");
         }
@@ -58,8 +57,6 @@ public class AuthService implements AuthUseCase {
         String nombreCompleto = clean(request.getNombreCompleto());
         String telefono = clean(request.getTelefono());
         String password = clean(request.getPassword());
-        
-        System.out.println("[REGISTER] Nombre: " + nombreCompleto + " | Teléfono: " + telefono);
 
         if (nombreCompleto.isEmpty() || telefono.isEmpty() || password.isEmpty()) {
             throw new IllegalArgumentException("Todos los campos son obligatorios");
@@ -105,9 +102,6 @@ public class AuthService implements AuthUseCase {
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         int usuarioId = rs.getInt(1);
-                        System.out.println("✅ Usuario creado con ID: " + usuarioId);
-                        
-                        // 🔑 Crear mascota en transacción SEPARADA pero ESPERAR resultado
                         try {
                             crearMascotaEnSegundoPlano(usuarioId);
                             // Pequeña pausa para permitir que el thread inicie
@@ -376,27 +370,23 @@ public class AuthService implements AuthUseCase {
      * Usa timestamp en lugar de date
      */
     private void crearMascotaDefault(Connection conn, int usuarioId) throws SQLException {
-        System.out.println("[MASCOTA] Iniciando creación para usuario " + usuarioId);
-        
         // Verificar si ya existe mascota para este usuario
         String checkMascotaSql = "SELECT mascota_id FROM public.mascota_estado WHERE usuario_id = ?";
         try (PreparedStatement psCheck = conn.prepareStatement(checkMascotaSql)) {
             psCheck.setInt(1, usuarioId);
             try (ResultSet rs = psCheck.executeQuery()) {
                 if (rs.next()) {
-                    System.out.println("⚠️ [MASCOTA] Mascota ya existe para usuario " + usuarioId);
                     return;
                 }
             }
         } catch (SQLException e) {
-            System.err.println("❌ [MASCOTA] Error verificar mascota: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Error al verificar mascota: " + e.getMessage());
             throw e;
         }
         
         Timestamp ahora = Timestamp.valueOf(LocalDateTime.now());
         
-        // 🔑 Sin RETURNING - usar RETURN_GENERATED_KEYS para columna IDENTITY
+        // Sin RETURNING: usar RETURN_GENERATED_KEYS para columna IDENTITY.
         String insertMascotaSql = "INSERT INTO public.mascota_estado (usuario_id, nombre, hambre, ultima_vez_alimentado) VALUES (?, ?, ?, ?)";
         int mascotaId = -1;
         try (PreparedStatement ps = conn.prepareStatement(insertMascotaSql, Statement.RETURN_GENERATED_KEYS)) {
@@ -410,22 +400,17 @@ public class AuthService implements AuthUseCase {
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     mascotaId = rs.getInt(1);
-                    System.out.println("✅ [MASCOTA] INSERT mascota_estado: mascota_id=" + mascotaId + " para usuario " + usuarioId);
                 } else {
                     throw new SQLException("No se retornó mascota_id después del INSERT");
                 }
             }
         } catch (SQLException e) {
-            System.err.println("❌ [MASCOTA] Error INSERT mascota_estado: " + e.getMessage());
-            System.err.println("    SQL: " + e.getSQLState() + " | Code: " + e.getErrorCode());
-            e.printStackTrace();
+            System.err.println("Error al crear mascota: " + e.getMessage());
             throw e;
         }
 
         if (mascotaId > 0) {
-            System.out.println("[MASCOTA] Creando comidas para mascota_id=" + mascotaId);
             crearComidassDefault(conn, mascotaId);
-            System.out.println("[MASCOTA] Creando ropa para mascota_id=" + mascotaId);
             crearRopaDefault(conn, mascotaId);
         } else {
             throw new SQLException("mascota_id no fue generado correctamente");
@@ -436,7 +421,6 @@ public class AuthService implements AuthUseCase {
      * Crea las 4 comidas por defecto (con cantidad 0) para una mascota
      */
     private void crearComidassDefault(Connection conn, int mascotaId) throws SQLException {
-        System.out.println("[COMIDAS] Iniciando creación para mascota " + mascotaId);
         String[] comidas = {"Krill", "Pez", "Calamar", "Coctel"};
         int[] beneficios = {15, 25, 50, 100};
 
@@ -448,16 +432,12 @@ public class AuthService implements AuthUseCase {
                 ps.setString(2, comidas[i]);
                 ps.setInt(3, 0);
                 ps.setInt(4, beneficios[i]);
-                int rows = ps.executeUpdate();
-                System.out.println("  ✅ [COMIDAS] " + comidas[i] + ": " + rows + " filas");
+                ps.executeUpdate();
             } catch (SQLException e) {
-                System.err.println("  ❌ [COMIDAS] Error " + comidas[i] + ": " + e.getMessage());
-                System.err.println("     SQL: " + e.getSQLState() + " | Code: " + e.getErrorCode());
-                e.printStackTrace();
+                System.err.println("Error al crear comida " + comidas[i] + ": " + e.getMessage());
                 throw e;
             }
         }
-        System.out.println("✅ [COMIDAS] Todas las comidas creadas para mascota " + mascotaId);
     }
 
     /**
@@ -466,23 +446,17 @@ public class AuthService implements AuthUseCase {
      * Otras prendas se agregan cuando el usuario las desbloquea
      */
     private void crearRopaDefault(Connection conn, int mascotaId) throws SQLException {
-        System.out.println("[ROPA] Iniciando creación para mascota " + mascotaId);
-        
         String insertRopaSql = "INSERT INTO public.mascota_ropa (mascota_id, nombre_ropa, esta_equipado) VALUES (?, ?, ?)";
         
         try (PreparedStatement ps = conn.prepareStatement(insertRopaSql)) {
             ps.setInt(1, mascotaId);
             ps.setString(2, "vacio");
             ps.setBoolean(3, true);  // Equipada por defecto (sin ropa)
-            int rows = ps.executeUpdate();
-            System.out.println("  ✅ [ROPA] vacio: " + rows + " filas");
+            ps.executeUpdate();
         } catch (SQLException e) {
-            System.err.println("  ❌ [ROPA] Error creando vacio: " + e.getMessage());
-            System.err.println("     SQL: " + e.getSQLState() + " | Code: " + e.getErrorCode());
-            e.printStackTrace();
+            System.err.println("Error al crear ropa por defecto: " + e.getMessage());
             throw e;
         }
-        System.out.println("✅ [ROPA] Prenda vacio creada para mascota " + mascotaId);
     }
 
     /**
@@ -493,21 +467,16 @@ public class AuthService implements AuthUseCase {
         // Ejecutar en thread separado para no bloquear el registro
         Thread mascotaThread = new Thread(() -> {
             try {
-                System.out.println("[ASYNC] 🚀 Thread iniciado para usuario " + usuarioId);
                 try (Connection conn = conexionDB.conectar()) {
-                    System.out.println("[ASYNC] 🔗 Conexión obtenida");
                     crearMascotaDefault(conn, usuarioId);
-                    System.out.println("[ASYNC] ✅ Mascota y comidas creadas para usuario " + usuarioId);
                 }
             } catch (Exception e) {
-                System.err.println("[ASYNC] ❌ Error para usuario " + usuarioId + ": " + e.getMessage());
-                e.printStackTrace();
+                System.err.println("Error al crear mascota para usuario " + usuarioId + ": " + e.getMessage());
             }
         }, "MascotaCreator-" + usuarioId);
         
         mascotaThread.setDaemon(false);
         mascotaThread.start();
-        System.out.println("[MAIN] Thread lanzado para mascota del usuario " + usuarioId);
     }
 
 }

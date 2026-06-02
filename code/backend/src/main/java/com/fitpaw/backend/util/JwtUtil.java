@@ -43,7 +43,7 @@ public class JwtUtil {
             verifier.verify(token);
             return true;
         } catch (JWTVerificationException ex) {
-            System.err.println("JWT verification failed: " + ex.getMessage());
+            System.err.println("Error al verificar JWT: " + ex.getMessage());
             throw ex;
         }
     }

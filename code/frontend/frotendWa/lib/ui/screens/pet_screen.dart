@@ -14,22 +14,23 @@ class PetScreen extends StatefulWidget {
   State<PetScreen> createState() => _PetScreenState();
 }
 
-  String _foodAssetForKey(String key) {
-    switch (key) {
-      case 'pez':
-        return 'assets/images/Pez.png';
-      case 'camaron':
-        return 'assets/images/Camaron.png';
-      case 'calamar':
-        return 'assets/images/Calamar.png';
-      case 'coctel':
-        return 'assets/images/Coctel de mariscos.png';
-      default:
-        return 'assets/images/Pez.png';
-    }
+String _foodAssetForKey(String key) {
+  switch (key) {
+    case 'pez':
+      return 'assets/images/Pez.png';
+    case 'camaron':
+      return 'assets/images/Camaron.png';
+    case 'calamar':
+      return 'assets/images/Calamar.png';
+    case 'coctel':
+      return 'assets/images/Coctel de mariscos.png';
+    default:
+      return 'assets/images/Pez.png';
   }
+}
 
-class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMixin {
+class _PetScreenState extends State<PetScreen>
+    with SingleTickerProviderStateMixin {
   static const String _defaultBase = 'assets/images/basico base.png';
   static const String _defaultHappy = 'assets/images/basico feliz.png';
   static const String _defaultSad = 'assets/images/basico triste.png';
@@ -55,21 +56,20 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
   final List<Timer> _hungerTimers = [];
   // Tracks which food is being thrown for the feeding animation (null = none)
   Timer? _throwFoodTimer;
-  
+
   String? _throwFoodKey;
-  
+
   // Datos de la mascota desde el backend
   Map<String, dynamic>? _petStatus;
   List<Map<String, dynamic>> _foodInventory = [];
   List<Map<String, dynamic>> _petClothing = [];
   bool _isLoadingPet = true;
-  
+
   double get _foodLevel => _petStatus?['hambre']?.toDouble() ?? 100;
   String _statusMessage = '';
   String _penguinAsset = _defaultHappy;
   // Which outfit is applied: null = none, 0 = conjunto1, 1 = conjunto2
   int? _appliedConjunto;
-  
 
   static const List<String> _feedMessages = [
     'que rico',
@@ -112,12 +112,12 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
   Future<void> _loadPetData() async {
     try {
       setState(() => _isLoadingPet = true);
-      
+
       // Cargar estado de mascota, comidas y ropa en paralelo
       final petStatus = await ApiClient().getPetStatus();
       final foods = await ApiClient().getPetFoods();
       final clothing = await ApiClient().getPetClothing();
-      
+
       setState(() {
         _petStatus = petStatus;
         _foodInventory = foods;
@@ -125,29 +125,28 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
         _petName = petStatus['nombre'] ?? 'Pingui';
         _nameController.text = _petName;
         _isLoadingPet = false;
-        
-        final equipadaIndex = _petClothing.indexWhere((r) => r['esta_equipado'] == true);
+
+        final equipadaIndex = _petClothing.indexWhere(
+          (r) => r['esta_equipado'] == true,
+        );
         if (equipadaIndex >= 0) {
-          final nombreEquipado = (_petClothing[equipadaIndex]['nombre_ropa'] as String?) ?? '';
+          final nombreEquipado =
+              (_petClothing[equipadaIndex]['nombre_ropa'] as String?) ?? '';
           _appliedConjunto = _outfitSlotForName(nombreEquipado);
         } else {
           _appliedConjunto = null;
         }
       });
-      
-      debugPrint('✅ Datos de mascota cargados: $_petName, hambre=${_foodLevel.toInt()}');
-      debugPrint('🍽️ Comidas cargadas: ${_foodInventory.length} tipos');
-      debugPrint('👕 Ropa cargada: ${_petClothing.length} prendas');
-      
+
       _updatePenguinByLevel();
-      
+
       // Iniciar timer de descenso de hambre
       _startHungerDecreaseTimer();
     } catch (e) {
       setState(() {
         _isLoadingPet = false;
       });
-      debugPrint('❌ Error cargando mascota: $e');
+      debugPrint('Error cargando mascota: $e');
     }
   }
 
@@ -156,7 +155,9 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
     if (lower == 'vacio') {
       return null;
     }
-    if (lower.contains('conjunto 1') || lower.contains('verde') || lower.contains('celeste')) {
+    if (lower.contains('conjunto 1') ||
+        lower.contains('verde') ||
+        lower.contains('celeste')) {
       return 0;
     }
     if (lower.contains('conjunto 2') ||
@@ -199,7 +200,7 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
   /// Refresca el hambre desde backend cada segundo.
   void _startHungerDecreaseTimer() {
     _cancelHungerTimers();
-    
+
     final timer = Timer.periodic(const Duration(seconds: 1), (_) async {
       if (!mounted || _petStatus == null) return;
 
@@ -211,10 +212,10 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
         });
         _updatePenguinByLevel();
       } catch (e) {
-        debugPrint('❌ Error refrescando hambre: $e');
+        debugPrint('Error refrescando hambre: $e');
       }
     });
-    
+
     _hungerTimers.add(timer);
   }
 
@@ -270,7 +271,6 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
     });
   }
 
-  
   void _triggerFoodThrow(String key) {
     _throwFoodTimer?.cancel();
     setState(() => _throwFoodKey = key);
@@ -283,7 +283,9 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
   void _feedPet(String foodName) async {
     // Encontrar la comida en el inventario
     final foodData = _foodInventory.firstWhere(
-      (f) => (f['nombreComida'] as String?)?.toLowerCase() == foodName.toLowerCase(),
+      (f) =>
+          (f['nombreComida'] as String?)?.toLowerCase() ==
+          foodName.toLowerCase(),
       orElse: () => {},
     );
 
@@ -301,12 +303,12 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
     try {
       // Llamar al backend para alimentar la mascota
       final response = await ApiClient().feedPet(foodName);
-      
+
       // Actualizar estado con la respuesta del backend
       setState(() {
         _petStatus = response;
         _statusMessage = _feedMessages[_random.nextInt(_feedMessages.length)];
-        
+
         if (_appliedConjunto == 0) {
           _penguinAsset = _conjunto1Happy;
         } else if (_appliedConjunto == 1) {
@@ -316,15 +318,13 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
         }
       });
 
-      debugPrint('✅ Mascota alimentada con $foodName, nuevo hambre: ${_foodLevel.toInt()}');
-
       // Recargar comidas después de 500ms para obtener el inventario actualizado
       _happyTimer = Timer(const Duration(milliseconds: 900), () {
         _loadPetData();
         _updatePenguinByLevel();
       });
     } catch (e) {
-      debugPrint('❌ Error alimentando mascota: $e');
+      debugPrint('Error alimentando mascota: $e');
       setState(() {
         _statusMessage = 'Error al alimentar';
       });
@@ -337,7 +337,7 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-            return _ClosetSheet(
+        return _ClosetSheet(
           scale: Responsive.scale(context),
           petClothing: _petClothing,
           appliedConjunto: _appliedConjunto,
@@ -353,15 +353,16 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
                   _petClothing[originalIndex]['esta_equipado'] = true;
                 });
                 _updatePenguinByLevel();
-                debugPrint('✅ Ropa equipada: ${_petClothing[originalIndex]['nombre_ropa']}');
               } catch (e) {
-                debugPrint('❌ Error equipando ropa: $e');
+                debugPrint('Error equipando ropa: $e');
                 _statusMessage = 'Error al equipar ropa';
               }
             }
           },
           onRemove: () async {
-            final vacioIndex = _petClothing.indexWhere((r) => (r['nombre_ropa'] as String?)?.toLowerCase() == 'vacio');
+            final vacioIndex = _petClothing.indexWhere(
+              (r) => (r['nombre_ropa'] as String?)?.toLowerCase() == 'vacio',
+            );
             try {
               await ApiClient().updateClothingNameEquipped('vacio', true);
               setState(() {
@@ -375,9 +376,8 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
                 _penguinAsset = _defaultHappy;
               });
               _updatePenguinByLevel();
-              debugPrint('✅ Ropa removida - equipada prenda vacio');
             } catch (e) {
-              debugPrint('❌ Error removiendo ropa: $e');
+              debugPrint('Error removiendo ropa: $e');
               setState(() {
                 _statusMessage = 'Error al remover ropa';
                 if (vacioIndex < 0) {
@@ -407,112 +407,136 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
         };
 
         return SafeArea(
-          child: LayoutBuilder(builder: (context, constraints) {
-            final double maxSheetHeight = constraints.maxHeight * 0.78;
-            return Align(
-              alignment: Alignment.bottomCenter,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: maxSheetHeight,
-                  maxWidth: Responsive.phoneWidth(context),
-                ),
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 24 * scale),
-                  padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 18 * scale),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24 * scale),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 24 * scale,
-                        offset: Offset(0, 12 * scale),
-                      ),
-                    ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double maxSheetHeight = constraints.maxHeight * 0.78;
+              return Align(
+                alignment: Alignment.bottomCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: maxSheetHeight,
+                    maxWidth: Responsive.phoneWidth(context),
                   ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Menu de comida',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: Responsive.fs(context, 18),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        SizedBox(height: 16 * scale),
-                        if (_isLoadingPet)
-                          Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.mintPrimary),
-                            ),
-                          )
-                        else if (_foodInventory.isEmpty)
-                          Center(
-                            child: Text(
-                              'Sin comida disponible',
-                              style: TextStyle(color: AppColors.textSecondary),
-                            ),
-                          )
-                        else
-                          GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _foodInventory.length,
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 12 * scale,
-                              crossAxisSpacing: 12 * scale,
-                              childAspectRatio: 1,
-                            ),
-                            itemBuilder: (context, index) {
-                              final food = _foodInventory[index];
-                              final String foodName = food['nombreComida'] ?? '';
-                              final int cantidad = food['cantidad'] ?? 0;
-                              final String keyLower = foodName.toLowerCase();
-                              final String asset = assetMap[keyLower] ?? assetMap['pez'] ?? '';
-                              
-                              return _buildFoodTile(
-                                context,
-                                scale,
-                                foodName,
-                                asset,
-                                foodName,
-                                cantidad,
-                              );
-                            },
-                          ),
-                        SizedBox(height: 8 * scale),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: Text(
-                              'Cerrar',
-                              style: TextStyle(
-                                color: AppColors.blueSecondary,
-                                fontSize: Responsive.fs(context, 13),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
+                  child: Container(
+                    margin: EdgeInsets.fromLTRB(
+                      16 * scale,
+                      16 * scale,
+                      16 * scale,
+                      24 * scale,
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 20 * scale,
+                      vertical: 18 * scale,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24 * scale),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 24 * scale,
+                          offset: Offset(0, 12 * scale),
                         ),
                       ],
                     ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Menu de comida',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: Responsive.fs(context, 18),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 16 * scale),
+                          if (_isLoadingPet)
+                            Center(
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.mintPrimary,
+                                ),
+                              ),
+                            )
+                          else if (_foodInventory.isEmpty)
+                            Center(
+                              child: Text(
+                                'Sin comida disponible',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            )
+                          else
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _foodInventory.length,
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    mainAxisSpacing: 12 * scale,
+                                    crossAxisSpacing: 12 * scale,
+                                    childAspectRatio: 1,
+                                  ),
+                              itemBuilder: (context, index) {
+                                final food = _foodInventory[index];
+                                final String foodName =
+                                    food['nombreComida'] ?? '';
+                                final int cantidad = food['cantidad'] ?? 0;
+                                final String keyLower = foodName.toLowerCase();
+                                final String asset =
+                                    assetMap[keyLower] ?? assetMap['pez'] ?? '';
+
+                                return _buildFoodTile(
+                                  context,
+                                  scale,
+                                  foodName,
+                                  asset,
+                                  foodName,
+                                  cantidad,
+                                );
+                              },
+                            ),
+                          SizedBox(height: 8 * scale),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: Text(
+                                'Cerrar',
+                                style: TextStyle(
+                                  color: AppColors.blueSecondary,
+                                  fontSize: Responsive.fs(context, 13),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            );
-          }),
+              );
+            },
+          ),
         );
       },
     );
   }
 
-  Widget _buildFoodTile(BuildContext context, double scale, String label, String? asset, String foodName, int count) {
+  Widget _buildFoodTile(
+    BuildContext context,
+    double scale,
+    String label,
+    String? asset,
+    String foodName,
+    int count,
+  ) {
     return InkWell(
       onTap: () {
         Navigator.of(context).pop();
@@ -527,7 +551,10 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
               decoration: BoxDecoration(
                 color: AppColors.fieldBackground.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(16 * scale),
-                border: Border.all(color: AppColors.blueSecondary.withValues(alpha: 0.4), width: 1 * scale),
+                border: Border.all(
+                  color: AppColors.blueSecondary.withValues(alpha: 0.4),
+                  width: 1 * scale,
+                ),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16 * scale),
@@ -540,9 +567,15 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
                           ? Image.asset(
                               asset,
                               fit: BoxFit.contain,
-                              errorBuilder: (c, e, s) => Center(child: Icon(Icons.fastfood, size: 40 * scale)),
+                              errorBuilder: (c, e, s) => Center(
+                                child: Icon(Icons.fastfood, size: 40 * scale),
+                              ),
                             )
-                          : Icon(Icons.fastfood, size: 40 * scale, color: AppColors.mintPrimary),
+                          : Icon(
+                              Icons.fastfood,
+                              size: 40 * scale,
+                              color: AppColors.mintPrimary,
+                            ),
                     ),
                   ),
                 ),
@@ -554,8 +587,20 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
               child: Container(
                 width: (36 * scale).clamp(28, 48),
                 height: (36 * scale).clamp(28, 48),
-                decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: const Color(0xFFECECEC))),
-                child: Center(child: Text('$count', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFECECEC)),
+                ),
+                child: Center(
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -577,7 +622,10 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
       setState(() => _isEditingName = true);
       _nameController
         ..text = _petName
-        ..selection = TextSelection(baseOffset: 0, extentOffset: _petName.length);
+        ..selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _petName.length,
+        );
       _nameFocus.requestFocus();
     }
   }
@@ -588,9 +636,8 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
       setState(() {
         _petName = response['nombre'] ?? nuevoNombre;
       });
-      debugPrint('✅ Nombre de mascota actualizado a: $_petName');
     } catch (e) {
-      debugPrint('❌ Error al actualizar nombre: $e');
+      debugPrint('Error al actualizar nombre: $e');
       // Revertir en UI si falla
       _nameController.text = _petName;
     }
@@ -605,7 +652,9 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: Responsive.phoneWidth(context)),
+            constraints: BoxConstraints(
+              maxWidth: Responsive.phoneWidth(context),
+            ),
             child: Stack(
               children: [
                 Positioned.fill(
@@ -614,7 +663,9 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        decoration: const BoxDecoration(gradient: AppColors.splashGradient),
+                        decoration: const BoxDecoration(
+                          gradient: AppColors.splashGradient,
+                        ),
                       );
                     },
                   ),
@@ -650,7 +701,8 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
                                     focusNode: _nameFocus,
                                     controller: _nameController,
                                     textAlign: TextAlign.center,
-                                    textCapitalization: TextCapitalization.words,
+                                    textCapitalization:
+                                        TextCapitalization.words,
                                     onSubmitted: (_) => _toggleNameEditing(),
                                     decoration: const InputDecoration(
                                       isDense: true,
@@ -741,19 +793,21 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
                                 child: AnimatedSlide(
                                   duration: const Duration(milliseconds: 700),
                                   curve: Curves.easeOut,
-                                  offset: _throwFoodKey != null ? const Offset(0.95, -1.05) : const Offset(0, 0.35),
+                                  offset: _throwFoodKey != null
+                                      ? const Offset(0.95, -1.05)
+                                      : const Offset(0, 0.35),
                                   child: AnimatedOpacity(
                                     duration: const Duration(milliseconds: 700),
-                                            opacity: _throwFoodKey != null ? 1 : 0,
-                                            child: IgnorePointer(
-                                              child: _throwFoodKey != null
-                                                  ? Image.asset(
-                                                      _foodAssetForKey(_throwFoodKey!),
-                                                      width: 70 * scale,
-                                                      fit: BoxFit.contain,
-                                                    )
-                                                  : const SizedBox.shrink(),
-                                            ),
+                                    opacity: _throwFoodKey != null ? 1 : 0,
+                                    child: IgnorePointer(
+                                      child: _throwFoodKey != null
+                                          ? Image.asset(
+                                              _foodAssetForKey(_throwFoodKey!),
+                                              width: 70 * scale,
+                                              fit: BoxFit.contain,
+                                            )
+                                          : const SizedBox.shrink(),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -783,10 +837,15 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 800),
                                     curve: Curves.easeOut,
-                                    width: constraints.maxWidth * (_foodLevel / 100),
+                                    width:
+                                        constraints.maxWidth *
+                                        (_foodLevel / 100),
                                     decoration: BoxDecoration(
                                       gradient: const LinearGradient(
-                                        colors: [Color(0xFFFF6B6B), Color(0xFFFF5252)],
+                                        colors: [
+                                          Color(0xFFFF6B6B),
+                                          Color(0xFFFF5252),
+                                        ],
                                         begin: Alignment.centerLeft,
                                         end: Alignment.centerRight,
                                       ),
@@ -820,10 +879,10 @@ class _PetScreenState extends State<PetScreen> with SingleTickerProviderStateMix
                             icon: Icons.checkroom_rounded,
                             isSelected: _selectedActionIndex == 1,
                             scale: scale,
-                              onTap: () {
-                                _selectAction(1);
-                                _openCloset();
-                              },
+                            onTap: () {
+                              _selectAction(1);
+                              _openCloset();
+                            },
                           ),
                         ],
                       ),
@@ -871,10 +930,7 @@ class _Snowflake {
 }
 
 class _SnowPainter extends CustomPainter {
-  const _SnowPainter({
-    required this.flakes,
-    required this.progress,
-  });
+  const _SnowPainter({required this.flakes, required this.progress});
 
   final List<_Snowflake> flakes;
   final double progress;
@@ -934,13 +990,18 @@ class _PetActionButton extends StatelessWidget {
           gradient: AppColors.primaryGradient,
           boxShadow: [
             BoxShadow(
-              color: AppColors.blueSecondary.withValues(alpha: isSelected ? 0.35 : 0.22),
+              color: AppColors.blueSecondary.withValues(
+                alpha: isSelected ? 0.35 : 0.22,
+              ),
               blurRadius: (isSelected ? 18 : 12) * scale,
               offset: Offset(0, 8 * scale),
             ),
           ],
           border: isSelected
-              ? Border.all(color: Colors.white.withValues(alpha: 0.9), width: 2 * scale)
+              ? Border.all(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  width: 2 * scale,
+                )
               : null,
         ),
         child: Icon(icon, color: Colors.white, size: 28 * scale),
@@ -1022,7 +1083,9 @@ class _ClosetSheetState extends State<_ClosetSheet> {
       return nombre.contains('verde') || nombre.contains('celeste');
     }
     if (target == 'conjunto 2') {
-      return nombre.contains('morada') || nombre.contains('morado') || nombre.contains('rosa');
+      return nombre.contains('morada') ||
+          nombre.contains('morado') ||
+          nombre.contains('rosa');
     }
     if (target == 'conjunto 4') {
       return nombre.contains('pirata');
@@ -1070,8 +1133,16 @@ class _ClosetSheetState extends State<_ClosetSheet> {
                 maxWidth: Responsive.phoneWidth(context),
               ),
               child: Container(
-                margin: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 24 * scale),
-                padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 18 * scale),
+                margin: EdgeInsets.fromLTRB(
+                  16 * scale,
+                  16 * scale,
+                  16 * scale,
+                  24 * scale,
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: 20 * scale,
+                  vertical: 18 * scale,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24 * scale),
@@ -1088,154 +1159,192 @@ class _ClosetSheetState extends State<_ClosetSheet> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                  Text(
-                    'Closet',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: Responsive.fs(context, 18),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  SizedBox(height: 4 * scale),
-                  Text(
-                    'Selecciona un conjunto (5 espacios).',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: Responsive.fs(context, 12),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  SizedBox(height: 16 * scale),
-                  Builder(
-                    builder: (context) {
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _orderedOutfits.length,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 12 * scale,
-                          crossAxisSpacing: 12 * scale,
-                          childAspectRatio: 1,
-                        ),
-                        itemBuilder: (context, index) {
-                          final String nombreRopa = _orderedOutfits[index];
-                          final clothingItem = _findUnlockedOutfit(nombreRopa);
-                          final originalIndex = _originalIndexFor(clothingItem);
-                          final bool unlocked = clothingItem != null && originalIndex != null;
-                          final String imagePath = _getClothingImagePath(nombreRopa);
-
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(16 * scale),
-                            onTap: unlocked ? () => _handleSelect(index) : null,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16 * scale),
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: AppColors.fieldBackground.withValues(alpha: 0.8),
-                                      borderRadius: BorderRadius.circular(16 * scale),
-                                      border: Border.all(
-                                        color: unlocked && index == _appliedConjunto
-                                            ? AppColors.mintPrimary
-                                            : AppColors.blueSecondary.withValues(alpha: 0.4),
-                                        width: 1 * scale,
-                                      ),
-                                    ),
-                                    child: Opacity(
-                                      opacity: unlocked ? 1 : 0.38,
-                                      child: SizedBox.expand(
-                                        child: Image.asset(
-                                          imagePath,
-                                          fit: BoxFit.cover,
-                                          alignment: Alignment.center,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (!unlocked)
-                                    Positioned.fill(
-                                      child: Container(
-                                        color: Colors.white.withValues(alpha: 0.42),
-                                        padding: EdgeInsets.symmetric(horizontal: 8 * scale),
-                                        child: Center(
-                                          child: Text(
-                                            'Obtén esta recompensa realizando tus metas',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: AppColors.textPrimary,
-                                              fontSize: Responsive.fs(context, 13),
-                                              fontWeight: FontWeight.w800,
-                                              height: 1.15,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  if (unlocked && _selectedIndex == index)
-                                    Positioned(
-                                      left: 8 * scale,
-                                      right: 8 * scale,
-                                      bottom: 8 * scale,
-                                      child: SizedBox(
-                                        height: 36 * scale,
-                                        child: ElevatedButton(
-                                          onPressed: () {
-                                            setState(() {
-                                              if (_appliedConjunto == index) {
-                                                _appliedConjunto = null;
-                                                widget.onRemove?.call();
-                                                return;
-                                              }
-                                              _appliedConjunto = index;
-                                              widget.onApply?.call(originalIndex, index);
-                                            });
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: _appliedConjunto == index
-                                                ? Colors.white
-                                                : AppColors.mintPrimary,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12 * scale),
-                                            ),
-                                            elevation: 2 * scale,
-                                          ),
-                                          child: Text(
-                                            _appliedConjunto == index ? 'Quitar' : 'Aplicar',
-                                            style: TextStyle(
-                                              color: _appliedConjunto == index ? AppColors.textPrimary : Colors.white,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-
-                  SizedBox(height: 8 * scale),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(
-                        'Cerrar',
+                      Text(
+                        'Closet',
                         style: TextStyle(
-                          color: AppColors.blueSecondary,
-                          fontSize: Responsive.fs(context, 13),
+                          color: AppColors.textPrimary,
+                          fontSize: Responsive.fs(context, 18),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                      SizedBox(height: 4 * scale),
+                      Text(
+                        'Selecciona un conjunto (5 espacios).',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: Responsive.fs(context, 12),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: 16 * scale),
+                      Builder(
+                        builder: (context) {
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _orderedOutfits.length,
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 12 * scale,
+                                  crossAxisSpacing: 12 * scale,
+                                  childAspectRatio: 1,
+                                ),
+                            itemBuilder: (context, index) {
+                              final String nombreRopa = _orderedOutfits[index];
+                              final clothingItem = _findUnlockedOutfit(
+                                nombreRopa,
+                              );
+                              final originalIndex = _originalIndexFor(
+                                clothingItem,
+                              );
+                              final bool unlocked =
+                                  clothingItem != null && originalIndex != null;
+                              final String imagePath = _getClothingImagePath(
+                                nombreRopa,
+                              );
+
+                              return InkWell(
+                                borderRadius: BorderRadius.circular(16 * scale),
+                                onTap: unlocked
+                                    ? () => _handleSelect(index)
+                                    : null,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    16 * scale,
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: AppColors.fieldBackground
+                                              .withValues(alpha: 0.8),
+                                          borderRadius: BorderRadius.circular(
+                                            16 * scale,
+                                          ),
+                                          border: Border.all(
+                                            color:
+                                                unlocked &&
+                                                    index == _appliedConjunto
+                                                ? AppColors.mintPrimary
+                                                : AppColors.blueSecondary
+                                                      .withValues(alpha: 0.4),
+                                            width: 1 * scale,
+                                          ),
+                                        ),
+                                        child: Opacity(
+                                          opacity: unlocked ? 1 : 0.38,
+                                          child: SizedBox.expand(
+                                            child: Image.asset(
+                                              imagePath,
+                                              fit: BoxFit.cover,
+                                              alignment: Alignment.center,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      if (!unlocked)
+                                        Positioned.fill(
+                                          child: Container(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.42,
+                                            ),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8 * scale,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                'Obtén esta recompensa realizando tus metas',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: AppColors.textPrimary,
+                                                  fontSize: Responsive.fs(
+                                                    context,
+                                                    13,
+                                                  ),
+                                                  fontWeight: FontWeight.w800,
+                                                  height: 1.15,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      if (unlocked && _selectedIndex == index)
+                                        Positioned(
+                                          left: 8 * scale,
+                                          right: 8 * scale,
+                                          bottom: 8 * scale,
+                                          child: SizedBox(
+                                            height: 36 * scale,
+                                            child: ElevatedButton(
+                                              onPressed: () {
+                                                setState(() {
+                                                  if (_appliedConjunto ==
+                                                      index) {
+                                                    _appliedConjunto = null;
+                                                    widget.onRemove?.call();
+                                                    return;
+                                                  }
+                                                  _appliedConjunto = index;
+                                                  widget.onApply?.call(
+                                                    originalIndex,
+                                                    index,
+                                                  );
+                                                });
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    _appliedConjunto == index
+                                                    ? Colors.white
+                                                    : AppColors.mintPrimary,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        12 * scale,
+                                                      ),
+                                                ),
+                                                elevation: 2 * scale,
+                                              ),
+                                              child: Text(
+                                                _appliedConjunto == index
+                                                    ? 'Quitar'
+                                                    : 'Aplicar',
+                                                style: TextStyle(
+                                                  color:
+                                                      _appliedConjunto == index
+                                                      ? AppColors.textPrimary
+                                                      : Colors.white,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+
+                      SizedBox(height: 8 * scale),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: Text(
+                            'Cerrar',
+                            style: TextStyle(
+                              color: AppColors.blueSecondary,
+                              fontSize: Responsive.fs(context, 13),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

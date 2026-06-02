@@ -24,12 +24,10 @@ public class StreakRewardService {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     int mascotaId = rs.getInt("mascota_id");
-                    System.out.println("✅ Mascota encontrada para usuario " + usuarioId + ": mascota_id=" + mascotaId);
                     return mascotaId;
                 }
             }
         }
-        System.out.println("❌ No se encontró mascota para usuario " + usuarioId);
         return -1;
     }
 
@@ -38,8 +36,6 @@ public class StreakRewardService {
      * Retorna true si es el primer ejercicio del día (racha fue activada)
      */
     public boolean verificarYActualizarRacha(Connection conn, int usuarioId, LocalDate fechaHoy) throws SQLException {
-        System.out.println("🔄 Verificando racha para usuario " + usuarioId + " en fecha " + fechaHoy);
-        
         try {
             // Obtener la racha actual
             String sqlObtener = "SELECT racha_id, cantidad_dias, fecha_ultima_actividad, activa FROM public.usuarios_racha WHERE usuario_id = ? "
@@ -50,7 +46,6 @@ public class StreakRewardService {
                 try (ResultSet rs = ps.executeQuery()) {
                     if (!rs.next()) {
                         // Primera vez, crear racha nueva
-                        System.out.println("✅ Primera racha para usuario " + usuarioId);
                         crearRachaInicial(conn, usuarioId, fechaHoy);
                         return true;
                     }
@@ -60,12 +55,8 @@ public class StreakRewardService {
                     LocalDate fechaUltimaActividad = rs.getDate("fecha_ultima_actividad") != null ? 
                         rs.getDate("fecha_ultima_actividad").toLocalDate() : null;
                     boolean activa = rs.getBoolean("activa");
-                    
-                    System.out.println("📊 Racha actual - ID: " + rachaId + ", Días: " + cantidadDias + 
-                        ", Última actividad: " + fechaUltimaActividad + ", Activa: " + activa);
 
                     if (cantidadDias <= 0) {
-                        System.out.println("🆕 Activando racha desde 0 en el primer ejercicio del día");
                         actualizarRacha(conn, rachaId, 1, fechaHoy, true);
                         return true;
                     }
@@ -76,38 +67,32 @@ public class StreakRewardService {
                         if (!activa) {
                             actualizarRacha(conn, rachaId, cantidadDias, fechaHoy, true);
                         }
-                        System.out.println("⏭️ Ya hay actividad hoy, no es primer ejercicio");
                         return false;
                     }
 
                     // Verificar si debe continuar o reiniciar la racha
                     if (fechaUltimaActividad != null) {
                         long diasDiferencia = java.time.temporal.ChronoUnit.DAYS.between(fechaUltimaActividad, fechaHoy);
-                        System.out.println("📅 Días desde última actividad: " + diasDiferencia);
 
                         if (diasDiferencia == 1) {
                             // Continuar racha (fue ayer el último ejercicio)
                             int nuevosDias = cantidadDias + 1;
-                            System.out.println("➕ Continuando racha: " + cantidadDias + " -> " + nuevosDias + " días");
                             actualizarRacha(conn, rachaId, nuevosDias, fechaHoy, true);
                             return true;
                         } else if (diasDiferencia > 1) {
                             // Reiniciar racha (pasaron más de 1 día)
-                            System.out.println("🔄 Reiniciando racha (pasaron " + diasDiferencia + " días)");
                             crearRachaInicial(conn, usuarioId, fechaHoy);
                             return true;
                         }
                     } else {
                         // Primera actividad, actualizar
-                        System.out.println("🆕 Primera actividad en la racha");
                         actualizarRacha(conn, rachaId, 1, fechaHoy, true);
                         return true;
                     }
                 }
             }
         } catch (SQLException e) {
-            System.err.println("❌ Error al actualizar racha: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Error al actualizar racha: " + e.getMessage());
             throw new IllegalStateException("Error al actualizar racha: " + e.getMessage());
         }
         return false;
@@ -233,17 +218,14 @@ public class StreakRewardService {
      * NOTA: Asume que los registros de comida ya existen en mascota_alimento (creados al registrarse)
      */
     public boolean otorgarAlimento(Connection conn, int usuarioId, String nombreComida, int cantidad) throws SQLException {
-        System.out.println("🍽️ Intentando otorgar: " + cantidad + "x " + nombreComida + " a usuario " + usuarioId);
-        
         int mascotaId = obtenerMascotaId(conn, usuarioId);
         if (mascotaId <= 0) {
-            System.out.println("❌ No se pudo otorgar alimento: mascota no encontrada");
+            System.err.println("No se pudo otorgar alimento: mascota no encontrada para usuario " + usuarioId);
             return false;
         }
 
         try {
             int beneficioPuntos = obtenerBeneficioPuntos(nombreComida);
-            System.out.println("📊 Beneficio de puntos para " + nombreComida + ": " + beneficioPuntos);
 
             // Actualizar cantidad existente (el registro SIEMPRE existe)
             String sqlUpdate = "UPDATE public.mascota_alimento SET cantidad = cantidad + ?, beneficio_puntos = ? WHERE mascota_id = ? AND nombre_comida = ?";
@@ -255,7 +237,6 @@ public class StreakRewardService {
                 int updated = psUpdate.executeUpdate();
                 
                 if (updated > 0) {
-                    System.out.println("✅ Alimento actualizado: " + nombreComida + " +=" + cantidad);
                     return true;
                 } else {
                     String insertSql = "INSERT INTO public.mascota_alimento (mascota_id, nombre_comida, cantidad, beneficio_puntos) "
@@ -266,14 +247,12 @@ public class StreakRewardService {
                         psInsert.setInt(3, cantidad);
                         psInsert.setInt(4, beneficioPuntos);
                         psInsert.executeUpdate();
-                        System.out.println("✅ Alimento creado: " + nombreComida + " +=" + cantidad);
                         return true;
                     }
                 }
             }
         } catch (SQLException e) {
-            System.err.println("❌ Error al otorgar alimento: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Error al otorgar alimento: " + e.getMessage());
             throw e;
         }
     }
@@ -309,7 +288,6 @@ public class StreakRewardService {
                     int diasRacha = rs.getInt("cantidad_dias");
                     
                     if (diasRacha >= 30) {
-                        System.out.println("🎉 ¡Racha de 30 días alcanzada para usuario " + usuarioId + "!");
                         int mascotaId = obtenerMascotaId(conn, usuarioId);
                         if (mascotaId > 0) {
                             return crearAtuendosDesbloqueados(conn, mascotaId);
@@ -352,10 +330,7 @@ public class StreakRewardService {
                     psInsert.setBoolean(3, false); // No equipado por defecto
                     psInsert.executeUpdate();
                     nuevos.add(atuendo);
-                    System.out.println("✅ Atuendo desbloqueado: " + atuendo + " para mascota " + mascotaId);
                 }
-            } else {
-                System.out.println("⚠️ Atuendo ya existe: " + atuendo);
             }
         }
         return nuevos;

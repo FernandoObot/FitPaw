@@ -332,11 +332,11 @@ public class StorageService implements ProgressPhotoUseCase {
                     .build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                System.out.println("No se pudo eliminar archivo en Supabase. Codigo: " + response.statusCode());
-                System.out.println("Detalles: " + response.body());
+                System.err.println("No se pudo eliminar archivo en Supabase. Codigo: " + response.statusCode());
+                System.err.println("Detalles: " + response.body());
             }
         } catch (Exception e) {
-            System.out.println("No se pudo eliminar archivo en Supabase: " + e.getMessage());
+            System.err.println("No se pudo eliminar archivo en Supabase: " + e.getMessage());
         }
     }
 
@@ -373,8 +373,8 @@ public class StorageService implements ProgressPhotoUseCase {
             return SUPABASE_URL + "/storage/v1/object/public/" + bucket + "/" + nombreArchivoSupabase;
         }
 
-        System.out.println("Error al subir foto. Código: " + response.statusCode());
-        System.out.println("Detalles: " + response.body());
+        System.err.println("Error al subir foto. Codigo: " + response.statusCode());
+        System.err.println("Detalles: " + response.body());
         return null;
     }
 

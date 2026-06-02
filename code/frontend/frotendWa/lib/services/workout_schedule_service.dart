@@ -17,11 +17,9 @@ class WorkoutScheduleService {
     required DateTime fecha,
     required int hora, // 6-23 (6 AM a 11 PM)
   }) async {
-    debugPrint('📝 Guardando ejercicio cardio: $nombre');
-    
     // Convertir dificultad a número: Baja=1, Media=2, Alta=3
     int difficultyValue = _difficultyToInt(dificultad);
-    
+
     final body = {
       'nombre': nombre,
       'dificultad': difficultyValue,
@@ -30,27 +28,23 @@ class WorkoutScheduleService {
       'hora': hora,
       'completado': false,
     };
-    
-    debugPrint('📤 Enviando: $body');
-    
+
     try {
       final response = await apiClient.post(
         '/ejercicios/cardio',
         body: body,
         needsAuth: true,
       );
-
-      debugPrint('📡 Respuesta: status=${response.statusCode}');
-      
       if (response.statusCode != 200 && response.statusCode != 201) {
-        final errorMsg = _extractErrorMessage(response.body, response.statusCode);
-        debugPrint('❌ Error al guardar ejercicio cardio: $errorMsg');
+        final errorMsg = _extractErrorMessage(
+          response.body,
+          response.statusCode,
+        );
+        debugPrint('Error al guardar ejercicio cardio: $errorMsg');
         throw Exception('No se pudo guardar ejercicio: $errorMsg');
       }
-      
-      debugPrint('✅ Ejercicio cardio guardado exitosamente');
     } catch (e) {
-      debugPrint('💥 Excepción al guardar ejercicio: $e');
+      debugPrint('Error al guardar ejercicio cardio: $e');
       rethrow;
     }
   }
@@ -65,10 +59,8 @@ class WorkoutScheduleService {
     required DateTime fecha,
     required int hora,
   }) async {
-    debugPrint('📝 Guardando ejercicio de fuerza: $nombre');
-    
     int difficultyValue = _difficultyToInt(dificultad);
-    
+
     final body = {
       'nombre': nombre,
       'grupo_muscular': grupoMuscular,
@@ -79,27 +71,23 @@ class WorkoutScheduleService {
       'hora': hora,
       'completado': false,
     };
-    
-    debugPrint('📤 Enviando: $body');
-    
+
     try {
       final response = await apiClient.post(
         '/ejercicios/fuerza',
         body: body,
         needsAuth: true,
       );
-
-      debugPrint('📡 Respuesta: status=${response.statusCode}');
-      
       if (response.statusCode != 200 && response.statusCode != 201) {
-        final errorMsg = _extractErrorMessage(response.body, response.statusCode);
-        debugPrint('❌ Error al guardar ejercicio de fuerza: $errorMsg');
+        final errorMsg = _extractErrorMessage(
+          response.body,
+          response.statusCode,
+        );
+        debugPrint('Error al guardar ejercicio de fuerza: $errorMsg');
         throw Exception('No se pudo guardar ejercicio: $errorMsg');
       }
-      
-      debugPrint('✅ Ejercicio de fuerza guardado exitosamente');
     } catch (e) {
-      debugPrint('💥 Excepción al guardar ejercicio: $e');
+      debugPrint('Error al guardar ejercicio de fuerza: $e');
       rethrow;
     }
   }
@@ -117,18 +105,24 @@ class WorkoutScheduleService {
     }
   }
 
-  
   /// Cargar ejercicios guardados para una fecha (cardio + fuerza)
-  Future<List<Map<String, dynamic>>> loadExercisesForDate({required DateTime fecha}) async {
+  Future<List<Map<String, dynamic>>> loadExercisesForDate({
+    required DateTime fecha,
+  }) async {
     final String dateStr = fecha.toString().split(' ')[0];
-    final response = await apiClient.get('/ejercicios?fecha=$dateStr', needsAuth: true);
+    final response = await apiClient.get(
+      '/ejercicios?fecha=$dateStr',
+      needsAuth: true,
+    );
 
     if (response.statusCode == 404) {
       return [];
     }
 
     if (response.statusCode != 200) {
-      throw Exception('No se pudieron cargar ejercicios: ${_extractErrorMessage(response.body, response.statusCode)}');
+      throw Exception(
+        'No se pudieron cargar ejercicios: ${_extractErrorMessage(response.body, response.statusCode)}',
+      );
     }
 
     final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
@@ -145,29 +139,27 @@ class WorkoutScheduleService {
   }) async {
     try {
       final ejerciciosDelDia = await loadExercisesForDate(fecha: fecha);
-      debugPrint('🔍 Validando conflictos para $nombreEjercicio a las $hora:00 - encontrados ${ejerciciosDelDia.length} ejercicios');
-      
+
       for (final ejercicio in ejerciciosDelDia) {
         final String nombreExistente = (ejercicio['nombre'] as String?) ?? '';
-        final int horaExistente = (ejercicio['hora'] is num) ? (ejercicio['hora'] as num).toInt() : 0;
-        
+        final int horaExistente = (ejercicio['hora'] is num)
+            ? (ejercicio['hora'] as num).toInt()
+            : 0;
+
         // Validación 1: ¿Hay ejercicio en este horario?
         if (horaExistente == hora) {
-          debugPrint('⚠️ CONFLICTO DE HORARIO: Ya hay "$nombreExistente" a las $hora:00');
-          return '⏰ Ya tienes "$nombreExistente" a las $hora:00. No puedes poner dos ejercicios en el mismo horario.';
+          return 'Ya tienes "$nombreExistente" a las $hora:00. No puedes poner dos ejercicios en el mismo horario.';
         }
-        
+
         // Validación 2: ¿Hay del mismo tipo en este día?
         if (nombreExistente.toLowerCase() == nombreEjercicio.toLowerCase()) {
-          debugPrint('⚠️ CONFLICTO DE TIPO: Ya existe "$nombreExistente" en este día');
-          return '🔄 Ya tienes "$nombreEjercicio" registrado en este día. Solo puedes hacer uno de cada tipo por día.';
+          return 'Ya tienes "$nombreEjercicio" registrado en este día. Solo puedes hacer uno de cada tipo por día.';
         }
       }
-      
-      debugPrint('✅ Sin conflictos para $nombreEjercicio');
+
       return null; // Sin conflictos
     } catch (e) {
-      debugPrint('⚠️ Error al validar conflictos: $e');
+      debugPrint('Error al validar conflictos: $e');
       return null; // Si hay error en la validación, permitir guardar igual
     }
   }
@@ -181,23 +173,20 @@ class WorkoutScheduleService {
     try {
       final response = await apiClient.patch(
         '/ejercicios/completar',
-        body: {
-          'nombre': nombre,
-          'fecha': dateStr,
-          'completado': true,
-        },
+        body: {'nombre': nombre, 'fecha': dateStr, 'completado': true},
         needsAuth: true,
       );
 
       if (response.statusCode != 200 && response.statusCode != 201) {
-        final errorMsg = _extractErrorMessage(response.body, response.statusCode);
-        debugPrint('❌ Error al marcar como completado: $errorMsg');
+        final errorMsg = _extractErrorMessage(
+          response.body,
+          response.statusCode,
+        );
+        debugPrint('Error al marcar como completado: $errorMsg');
         throw Exception('No se pudo marcar como completado: $errorMsg');
       }
-
-      debugPrint('✅ Ejercicio "$nombre" marcado como completado');
     } catch (e) {
-      debugPrint('💥 Excepción al marcar completado: $e');
+      debugPrint('Error al marcar como completado: $e');
       rethrow;
     }
   }
@@ -215,14 +204,15 @@ class WorkoutScheduleService {
       );
 
       if (response.statusCode != 200 && response.statusCode != 204) {
-        final errorMsg = _extractErrorMessage(response.body, response.statusCode);
-        debugPrint('❌ Error al eliminar ejercicio: $errorMsg');
+        final errorMsg = _extractErrorMessage(
+          response.body,
+          response.statusCode,
+        );
+        debugPrint('Error al eliminar ejercicio: $errorMsg');
         throw Exception('No se pudo eliminar el ejercicio: $errorMsg');
       }
-
-      debugPrint('✅ Ejercicio "$nombre" eliminado');
     } catch (e) {
-      debugPrint('💥 Excepción al eliminar ejercicio: $e');
+      debugPrint('Error al eliminar ejercicio: $e');
       rethrow;
     }
   }
@@ -233,7 +223,8 @@ class WorkoutScheduleService {
     }
 
     try {
-      final Map<String, dynamic> data = jsonDecode(body) as Map<String, dynamic>;
+      final Map<String, dynamic> data =
+          jsonDecode(body) as Map<String, dynamic>;
       final String? mensaje = data['mensaje'] as String?;
       if (mensaje != null && mensaje.trim().isNotEmpty) {
         return mensaje;

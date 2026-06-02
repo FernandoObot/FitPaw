@@ -63,41 +63,33 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
   }
 
   Future<void> _loadProfileName() async {
-    debugPrint('📱 Iniciando _loadProfileName()');
     try {
       final result = await _authService.getProfile();
-      debugPrint('📱 Resultado getProfile: $result');
 
       if (!mounted) {
-        debugPrint('📱 Widget no está mounted, cancelando actualización');
         return;
       }
 
       if (result['success'] == true) {
         final data = result['data'] as Map<String, dynamic>;
-        debugPrint('📱 Datos del perfil obtenidos: $data');
         final nickname = data['nickname'] as String?;
 
         setState(() {
           if (nickname != null && nickname.trim().isNotEmpty) {
             _profileName = nickname;
-            debugPrint('✅ Nombre cargado desde API: $_profileName');
-          } else {
-            debugPrint('⚠️ Nickname vacío o null, usando: $_profileName');
           }
           _loadingProfileName = false;
         });
       } else {
         final error = result['error'];
-        debugPrint('❌ Error al cargar perfil: $error');
+        debugPrint('Error al cargar perfil: $error');
         setState(() {
           _loadingProfileName = false;
           // Mantener el nombre por defecto si hay error
-          debugPrint('⚠️ Usando nombre por defecto: $_profileName');
         });
       }
     } catch (e) {
-      debugPrint('❌ Excepción en _loadProfileName: $e');
+      debugPrint('Error al cargar perfil: $e');
       if (mounted) {
         setState(() => _loadingProfileName = false);
       }
@@ -105,7 +97,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
   }
 
   Future<void> _loadRachaData() async {
-    debugPrint('🔥 Cargando datos de racha...');
     try {
       final diasRacha = await RachaService().obtenerDiasRacha();
       if (!mounted) return;
@@ -113,16 +104,15 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       setState(() {
         _diasRacha = diasRacha;
         _loadingRacha = false;
-        debugPrint('✅ Racha cargada: $_diasRacha días');
       });
     } catch (e) {
       if (mounted) {
         setState(() {
           _diasRacha = 0;
           _loadingRacha = false;
-          debugPrint('❌ Error cargando racha: $e');
         });
       }
+      debugPrint('Error cargando racha: $e');
     }
   }
 

@@ -20,15 +20,15 @@ class _StepperRegisterState extends State<StepperRegister> {
         padding: const EdgeInsets.all(25.0),
         child: Column(
           children: [
-            Expanded(child: _buildCurrentStep()), // Aquí se infla el paso actual
+            Expanded(
+              child: _buildCurrentStep(),
+            ), // Aquí se infla el paso actual
             MainButton(
               text: currentStep == 2 ? "CONFIRMAR" : "SIGUIENTE",
               onPressed: () {
                 setState(() {
                   if (currentStep < 2) {
                     currentStep++;
-                  } else {
-                    print("Llamando a Java Backend...");
                   }
                 });
               },
@@ -45,8 +45,11 @@ class _StepperRegisterState extends State<StepperRegister> {
       case 0:
         return Column(
           children: [
-            const Text("Hola,\nCrea una cuenta", textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text(
+              "Hola,\nCrea una cuenta",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 30),
             _buildInput("Nombre completo", Icons.person_outline),
             _buildInput("Número de teléfono", Icons.phone_android_outlined),
@@ -57,7 +60,10 @@ class _StepperRegisterState extends State<StepperRegister> {
       case 1:
         return Column(
           children: [
-            const Text("Completa tu perfil", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text(
+              "Completa tu perfil",
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 20),
             _buildInput("Selecciona tu género", Icons.people_outline),
             _buildInput("Año de nacimiento", Icons.calendar_month_outlined),

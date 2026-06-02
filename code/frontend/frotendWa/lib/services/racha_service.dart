@@ -6,7 +6,7 @@ class RachaService {
   final ApiClient _apiClient = ApiClient();
 
   /// Obtiene la información de racha del usuario autenticado
-  /// 
+  ///
   /// Retorna un mapa con:
   /// - racha_id: ID de la racha
   /// - usuario_id: ID del usuario
@@ -16,7 +16,7 @@ class RachaService {
   Future<Map<String, dynamic>> obtenerRachaInfo() async {
     try {
       final response = await _apiClient.get('/streak/info', needsAuth: true);
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return data;
@@ -24,7 +24,7 @@ class RachaService {
         throw Exception('Error al obtener racha: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('❌ Error en RachaService.obtenerRachaInfo: $e');
+      debugPrint('Error en RachaService.obtenerRachaInfo: $e');
       rethrow;
     }
   }
@@ -32,7 +32,9 @@ class RachaService {
   /// Obtiene solo el conteo de días de racha
   Future<int> obtenerDiasRacha() async {
     final racha = await obtenerRachaInfo();
-    return (racha['cantidad_dias'] as int?) ?? (racha['conteoDias'] as int?) ?? 0;
+    return (racha['cantidad_dias'] as int?) ??
+        (racha['conteoDias'] as int?) ??
+        0;
   }
 
   /// Obtiene solo si la racha está activa
@@ -42,10 +44,10 @@ class RachaService {
   }
 
   /// Marca un ejercicio como completado y obtiene información de recompensas
-  /// 
+  ///
   /// [nombre]: Nombre del ejercicio
   /// [fecha]: Fecha del ejercicio (formato: yyyy-MM-dd)
-  /// 
+  ///
   /// Retorna un mapa con:
   /// - usuario_id: ID del usuario
   /// - success: Si fue exitoso
@@ -59,10 +61,7 @@ class RachaService {
     try {
       final response = await _apiClient.post(
         '/api/ejercicios/completar',
-        body: {
-          'nombre': nombre,
-          'fecha': fecha,
-        },
+        body: {'nombre': nombre, 'fecha': fecha},
         needsAuth: true,
       );
 
@@ -70,10 +69,12 @@ class RachaService {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return data;
       } else {
-        throw Exception('Error al marcar ejercicio completado: ${response.statusCode}');
+        throw Exception(
+          'Error al marcar ejercicio completado: ${response.statusCode}',
+        );
       }
     } catch (e) {
-      debugPrint('❌ Error en RachaService.marcarEjercicioCompletado: $e');
+      debugPrint('Error en RachaService.marcarEjercicioCompletado: $e');
       rethrow;
     }
   }

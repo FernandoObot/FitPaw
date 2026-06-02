@@ -136,18 +136,15 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
   Future<void> _loadExercisePlan({DateTime? forDate}) async {
     final date = forDate ?? _selectedDate;
 
-    debugPrint('🔄 _loadExercisePlan START - fecha=${date.toString()}');
-
     setState(() => _isLoadingSentadillas = true);
 
     try {
       // La BD es la fuente de verdad: no pintar ejercicios optimistas.
       Map<String, ExercisePlan> nuevosEjercicios = {};
 
-      // ✅ ÚNICA FUENTE: Cargar ejercicios guardados por fecha (cardio + fuerza)
+      // Unica fuente: cargar ejercicios guardados por fecha (cardio + fuerza).
       try {
         final saved = await _scheduleService.loadExercisesForDate(fecha: date);
-        debugPrint('📥 Cargar desde BD: ${saved.length} ejercicios');
 
         for (final Map<String, dynamic> row in saved) {
           try {
@@ -204,13 +201,12 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
             );
 
             nuevosEjercicios[nombre] = planFromSaved;
-            debugPrint('  ✅ $nombre (completado=$completado)');
           } catch (e) {
-            debugPrint('  ⚠️ Error: $e');
+            debugPrint('Error al procesar ejercicio guardado: $e');
           }
         }
       } catch (e) {
-        debugPrint('❌ Error al cargar: $e');
+        debugPrint('Error al cargar ejercicios: $e');
       }
 
       if (!mounted) return;
@@ -219,14 +215,10 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
         _ejercicios = nuevosEjercicios;
         _isLoadingSentadillas = false;
       });
-
-      debugPrint(
-        '✅ Cargados ${nuevosEjercicios.length} ejercicios: ${nuevosEjercicios.keys.toList()}',
-      );
     } catch (error) {
       if (!mounted) return;
       setState(() => _isLoadingSentadillas = false);
-      debugPrint('❌ Error: $error');
+      debugPrint('Error al cargar plan de ejercicios: $error');
     }
   }
 
@@ -875,10 +867,6 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
 
   Future<void> _markExerciseComplete(String exerciseName) async {
     try {
-      debugPrint(
-        '📝 Marcando $exerciseName como completado para fecha ${_selectedDate}',
-      );
-
       final rachaService = RachaService();
       final fechaFormato = _selectedDate.toIso8601String().split('T')[0];
       final response = await rachaService.marcarEjercicioCompletado(
@@ -888,22 +876,16 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
 
       if (!mounted) return;
 
-      debugPrint('✅ $exerciseName marcado como completado');
-      debugPrint(
-        '🔥 Racha actualizada: ${response['dias_racha']} días (Activa: ${response['racha_activa']})',
-      );
-
       // Mostrar recompensas si existen en la respuesta
       final recompensas = response['recompensas'] as List?;
       if (recompensas != null && recompensas.isNotEmpty) {
-        String rewardMsg = '🎁 ¡Recompensas recibidas!\n';
+        String rewardMsg = 'Recompensas recibidas\n';
         for (var reward in recompensas) {
           if (reward is Map) {
             rewardMsg +=
                 '${reward['nombre'] ?? 'Recompensa'}: +${reward['cantidad'] ?? 0}\n';
           }
         }
-        debugPrint(rewardMsg);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(rewardMsg.trim()),
@@ -925,7 +907,6 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
           atuendosNuevos.isNotEmpty) {
         final String clothMsg =
             '¡Atuendos desbloqueados!\n${atuendosNuevos.join('\n')}';
-        debugPrint(clothMsg);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -942,13 +923,13 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✅ $exerciseName marcado como completado'),
+          content: Text('$exerciseName marcado como completado'),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 2),
         ),
       );
     } catch (e) {
-      debugPrint('❌ Error al marcar $exerciseName como completado: $e');
+      debugPrint('Error al marcar $exerciseName como completado: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -958,14 +939,10 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
 
   Future<void> _removeExercise(String exerciseName) async {
     try {
-      debugPrint('🗑️ Eliminando $exerciseName de la fecha ${_selectedDate}');
-
       await _scheduleService.deleteExercise(
         nombre: exerciseName,
         fecha: _selectedDate,
       );
-
-      debugPrint('✅ $exerciseName eliminado');
 
       // Remover inmediatamente del mapa local para actualizar la UI
       setState(() {
@@ -979,13 +956,13 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('🗑️ $exerciseName eliminado'),
+          content: Text('$exerciseName eliminado'),
           backgroundColor: Colors.orange,
           duration: const Duration(seconds: 2),
         ),
       );
     } catch (e) {
-      debugPrint('❌ Error al eliminar $exerciseName: $e');
+      debugPrint('Error al eliminar $exerciseName: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1418,12 +1395,7 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
   }
 
   List<_ScheduleItem> _scheduleForDate(DateTime date) {
-    final int weekday = date.weekday;
     List<_ScheduleItem> items = [];
-
-    debugPrint(
-      '📋 _scheduleForDate LLAMADO - fecha=$date, weekday=$weekday, _ejercicios.keys=${_ejercicios.keys.toList()}',
-    );
 
     // Agregar todos los ejercicios cargados del mapa unificado
     for (var entry in _ejercicios.entries) {
@@ -1439,14 +1411,10 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
           isCompleted: ejercicio.completed,
         ),
       );
-      debugPrint(
-        '📋 Agregado item: $nombre -> ${ejercicio.summaryLabel} (completado=${ejercicio.completed})',
-      );
     }
 
     // Si hay ejercicios cargados, retornarlos
     if (items.isNotEmpty) {
-      debugPrint('📋 Retornando ${items.length} items del mapa');
       return items;
     }
 
