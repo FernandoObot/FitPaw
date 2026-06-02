@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/app_colors.dart';
 import '../widgets/responsive.dart';
@@ -9,7 +10,6 @@ import 'camera_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'pet_screen.dart';
 import 'sign_in_screen.dart';
-import 'progress_screen.dart';
 import 'training_schedule_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -20,6 +20,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  static const String _realDataMessage = 'Ponga datos reales';
   int _selectedAccountIndex = 0;
   bool _selectedOther = false;
   int _selectedBottomIndex = 4;
@@ -70,11 +71,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: Responsive.phoneWidth(context)),
+            constraints: BoxConstraints(
+              maxWidth: Responsive.phoneWidth(context),
+            ),
             child: Column(
               children: [
                 Padding(
-                  padding: EdgeInsets.fromLTRB(20 * scale, 12 * scale, 20 * scale, 8 * scale),
+                  padding: EdgeInsets.fromLTRB(
+                    20 * scale,
+                    12 * scale,
+                    20 * scale,
+                    8 * scale,
+                  ),
                   child: Center(
                     child: Text(
                       'Perfil',
@@ -88,7 +96,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(20 * scale, 8 * scale, 20 * scale, 18 * scale),
+                    padding: EdgeInsets.fromLTRB(
+                      20 * scale,
+                      8 * scale,
+                      20 * scale,
+                      18 * scale,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -101,7 +114,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 shape: BoxShape.circle,
                                 gradient: AppColors.primaryGradient,
                               ),
-                              child: Icon(Icons.person_rounded, color: Colors.white, size: 26 * scale),
+                              child: Icon(
+                                Icons.person_rounded,
+                                color: Colors.white,
+                                size: 26 * scale,
+                              ),
                             ),
                             SizedBox(width: 12 * scale),
                             Expanded(
@@ -163,27 +180,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ElevatedButton(
                                           onPressed: _saveProfileEdits,
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF8EE596),
-                                            padding: EdgeInsets.symmetric(horizontal: 14 * scale),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18 * scale)),
+                                            backgroundColor: const Color(
+                                              0xFF8EE596,
+                                            ),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 14 * scale,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                    18 * scale,
+                                                  ),
+                                            ),
                                             elevation: 0,
                                           ),
                                           child: Text(
                                             'Guardar',
-                                            style: TextStyle(color: Colors.white, fontSize: Responsive.fs(context, 12), fontWeight: FontWeight.w600),
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: Responsive.fs(
+                                                context,
+                                                12,
+                                              ),
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
                                         ),
                                         SizedBox(width: 8 * scale),
                                         OutlinedButton(
                                           onPressed: _cancelProfileEdits,
                                           style: OutlinedButton.styleFrom(
-                                            padding: EdgeInsets.symmetric(horizontal: 14 * scale),
-                                            side: BorderSide(color: AppColors.textSecondary.withValues(alpha: 0.4)),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18 * scale)),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 14 * scale,
+                                            ),
+                                            side: BorderSide(
+                                              color: AppColors.textSecondary
+                                                  .withValues(alpha: 0.4),
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                    18 * scale,
+                                                  ),
+                                            ),
                                           ),
                                           child: Text(
                                             'Cancelar',
-                                            style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.fs(context, 12), fontWeight: FontWeight.w600),
+                                            style: TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: Responsive.fs(
+                                                context,
+                                                12,
+                                              ),
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -191,14 +241,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   : ElevatedButton(
                                       onPressed: _startProfileEdit,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF8EE596),
-                                        padding: EdgeInsets.symmetric(horizontal: 18 * scale),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18 * scale)),
+                                        backgroundColor: const Color(
+                                          0xFF8EE596,
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 18 * scale,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            18 * scale,
+                                          ),
+                                        ),
                                         elevation: 0,
                                       ),
                                       child: Text(
                                         'Editar',
-                                        style: TextStyle(color: Colors.white, fontSize: Responsive.fs(context, 12), fontWeight: FontWeight.w600),
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: Responsive.fs(context, 12),
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                             ),
@@ -214,7 +276,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       controller: _heightController,
                                       suffix: 'cm',
                                     )
-                                  : _MetricCard(label: 'Estatura', value: _profileHeight),
+                                  : _MetricCard(
+                                      label: 'Estatura',
+                                      value: _profileHeight,
+                                    ),
                             ),
                             SizedBox(width: 10 * scale),
                             Expanded(
@@ -224,11 +289,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       controller: _weightController,
                                       suffix: 'kg',
                                     )
-                                  : _MetricCard(label: 'Peso', value: _profileWeight),
+                                  : _MetricCard(
+                                      label: 'Peso',
+                                      value: _profileWeight,
+                                    ),
                             ),
                             SizedBox(width: 10 * scale),
                             Expanded(
-                              child: _MetricCard(label: 'Edad', value: _profileAge),
+                              child: _MetricCard(
+                                label: 'Edad',
+                                value: _profileAge,
+                              ),
                             ),
                           ],
                         ),
@@ -244,11 +315,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 onTap: () {
                                   setState(() => _selectedAccountIndex = 0);
                                   Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => const TrainingScheduleScreen(
-                                      exerciseTitle: 'Programa de entrenamiento',
-                                      exerciseSubtitle: 'Tu plan personalizado',
-                                      exerciseIcon: Icons.query_stats_rounded,
-                                    )),
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const TrainingScheduleScreen(
+                                            exerciseTitle:
+                                                'Programa de entrenamiento',
+                                            exerciseSubtitle:
+                                                'Tu plan personalizado',
+                                            exerciseIcon:
+                                                Icons.query_stats_rounded,
+                                          ),
+                                    ),
                                   );
                                 },
                               ),
@@ -259,7 +336,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 onTap: () {
                                   setState(() => _selectedAccountIndex = 1);
                                   Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => const ActivityHistoryScreen()),
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const ActivityHistoryScreen(),
+                                    ),
                                   );
                                 },
                               ),
@@ -275,7 +355,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 icon: Icons.settings_outlined,
                                 label: 'Ajustes',
                                 isSelected: _selectedOther,
-                                onTap: () => setState(() => _selectedOther = !_selectedOther),
+                                onTap: () => setState(
+                                  () => _selectedOther = !_selectedOther,
+                                ),
                               ),
                               AnimatedCrossFade(
                                 firstChild: const SizedBox.shrink(),
@@ -287,11 +369,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     child: OutlinedButton.icon(
                                       onPressed: _goToSignIn,
                                       style: OutlinedButton.styleFrom(
-                                        side: BorderSide(color: const Color(0xFFFF6A6A).withValues(alpha: 0.35)),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14 * scale)),
+                                        side: BorderSide(
+                                          color: const Color(
+                                            0xFFFF6A6A,
+                                          ).withValues(alpha: 0.35),
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14 * scale,
+                                          ),
+                                        ),
                                         backgroundColor: Colors.white,
                                       ),
-                                      icon: const Icon(Icons.logout_rounded, color: Color(0xFFFF6A6A)),
+                                      icon: const Icon(
+                                        Icons.logout_rounded,
+                                        color: Color(0xFFFF6A6A),
+                                      ),
                                       label: Text(
                                         'Cerrar sesión',
                                         style: TextStyle(
@@ -303,7 +396,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                   ),
                                 ),
-                                crossFadeState: _selectedOther ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                                crossFadeState: _selectedOther
+                                    ? CrossFadeState.showSecond
+                                    : CrossFadeState.showFirst,
                                 duration: const Duration(milliseconds: 180),
                               ),
                             ],
@@ -326,10 +421,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _setAccountSelection(int index) {
-    setState(() => _selectedAccountIndex = index);
-  }
-
   void _goToSignIn() {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const SignInScreen()),
@@ -342,8 +433,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _isEditingProfile = true;
       _nameController.text = _inputValue(_profileName);
       _goalController.text = _inputValue(_profileGoal);
-      _heightController.text = _inputValue(_profileHeight.replaceAll(' cm', ''));
-      _weightController.text = _inputValue(_profileWeight.replaceAll(' kg', ''));
+      _heightController.text = _inputValue(
+        _profileHeight.replaceAll(' cm', ''),
+      );
+      _weightController.text = _inputValue(
+        _profileWeight.replaceAll(' kg', ''),
+      );
       _ageController.text = _inputValue(_profileAge);
     });
   }
@@ -353,8 +448,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _isEditingProfile = false;
       _nameController.text = _inputValue(_profileName);
       _goalController.text = _inputValue(_profileGoal);
-      _heightController.text = _inputValue(_profileHeight.replaceAll(' cm', ''));
-      _weightController.text = _inputValue(_profileWeight.replaceAll(' kg', ''));
+      _heightController.text = _inputValue(
+        _profileHeight.replaceAll(' cm', ''),
+      );
+      _weightController.text = _inputValue(
+        _profileWeight.replaceAll(' kg', ''),
+      );
       _ageController.text = _inputValue(_profileAge);
     });
   }
@@ -377,6 +476,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       height = int.tryParse(newHeightText);
     }
 
+    if ((newWeightText.isNotEmpty &&
+            (weight == null || weight < 40 || weight > 300)) ||
+        (newHeightText.isNotEmpty &&
+            (height == null || height < 120 || height > 220))) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text(_realDataMessage)));
+      return;
+    }
+
     try {
       final result = await _authService.editProfile(
         nombreCompleto: newName.isEmpty ? null : newName,
@@ -388,18 +497,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (!mounted) return;
         setState(() {
           if (newName.isNotEmpty) _profileName = newName;
-          if (newHeightText.isNotEmpty && height != null) _profileHeight = '${height} cm';
-          if (newWeightText.isNotEmpty && weight != null) _profileWeight = '${weight.toString()} kg';
-          _profileGoal = _goalController.text.trim().isEmpty ? _profileGoal : _goalController.text.trim();
+          if (newHeightText.isNotEmpty && height != null) {
+            _profileHeight = '$height cm';
+          }
+          if (newWeightText.isNotEmpty && weight != null) {
+            _profileWeight = '${weight.toString()} kg';
+          }
+          _profileGoal = _goalController.text.trim().isEmpty
+              ? _profileGoal
+              : _goalController.text.trim();
           _isEditingProfile = false;
         });
       } else {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${result['error']}')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${result['error']}')));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -414,26 +533,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (mounted) {
           setState(() {
             // Actualizar nombre si existe
-            if (data['nickname'] != null && (data['nickname'] as String).isNotEmpty) {
+            if (data['nickname'] != null &&
+                (data['nickname'] as String).isNotEmpty) {
               _profileName = data['nickname'] as String;
               debugPrint('✅ Nombre actualizado: $_profileName');
             }
-            
+
             // Objetivo ya no viene del backend, mantener el valor por defecto
             // _profileGoal = data['objetivoPrincipal'] ?? _profileGoal;
-            
+
             // Actualizar estatura si existe
             if (data['estaturaCm'] != null) {
               _profileHeight = '${data['estaturaCm']} cm';
               debugPrint('✅ Estatura actualizada: $_profileHeight');
             }
-            
+
             // Actualizar peso si existe
             if (data['pesoActual'] != null) {
               _profileWeight = '${data['pesoActual'].toString()} kg';
               debugPrint('✅ Peso actualizado: $_profileWeight');
             }
-            
+
             // Calcular edad si existe fecha de nacimiento (ahora es un año como integer)
             if (data['fechaNacimiento'] != null) {
               try {
@@ -441,17 +561,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final now = DateTime.now();
                 final edad = now.year - ano;
                 _profileAge = edad.toString();
-                debugPrint('✅ Edad calculada: $_profileAge (año nacimiento: $ano)');
+                debugPrint(
+                  '✅ Edad calculada: $_profileAge (año nacimiento: $ano)',
+                );
               } catch (e) {
                 debugPrint('⚠️ Error al calcular edad: $e');
               }
             }
-            
+
             // Actualizar controllers
             _nameController.text = _inputValue(_profileName);
             _goalController.text = _inputValue(_profileGoal);
-            _heightController.text = _inputValue(_profileHeight.replaceAll(' cm', ''));
-            _weightController.text = _inputValue(_profileWeight.replaceAll(' kg', ''));
+            _heightController.text = _inputValue(
+              _profileHeight.replaceAll(' cm', ''),
+            );
+            _weightController.text = _inputValue(
+              _profileWeight.replaceAll(' kg', ''),
+            );
             _ageController.text = _inputValue(_profileAge);
             debugPrint('✅ Perfil completamente actualizado');
           });
@@ -474,11 +600,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } else if (index == 1) {
       Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => const TrainingScheduleScreen(
-            exerciseTitle: 'Programa de entrenamiento',
-            exerciseSubtitle: 'Tu plan personalizado',
-            exerciseIcon: Icons.query_stats_rounded,
-          )))
+          .push(
+            MaterialPageRoute(
+              builder: (_) => const TrainingScheduleScreen(
+                exerciseTitle: 'Programa de entrenamiento',
+                exerciseSubtitle: 'Tu plan personalizado',
+                exerciseIcon: Icons.query_stats_rounded,
+              ),
+            ),
+          )
           .then((_) => setState(() => _selectedBottomIndex = 4));
     } else if (index == 2) {
       Navigator.of(context)
@@ -548,18 +678,27 @@ class _MetricInputCard extends StatelessWidget {
     final double scale = Responsive.scale(context);
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 10 * scale),
+      padding: EdgeInsets.symmetric(
+        horizontal: 10 * scale,
+        vertical: 10 * scale,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14 * scale),
-        border: Border.all(color: AppColors.mintPrimary.withValues(alpha: 0.35)),
+        border: Border.all(
+          color: AppColors.mintPrimary.withValues(alpha: 0.35),
+        ),
       ),
       child: Column(
         children: [
           TextField(
             controller: controller,
             textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            maxLength: 3,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: InputDecoration(
+              counterText: '',
               isDense: true,
               border: InputBorder.none,
               suffixText: suffix.isEmpty ? null : suffix,
@@ -600,7 +739,12 @@ class _SectionCard extends StatelessWidget {
     final double scale = Responsive.scale(context);
 
     return Container(
-      padding: EdgeInsets.fromLTRB(16 * scale, 14 * scale, 16 * scale, 10 * scale),
+      padding: EdgeInsets.fromLTRB(
+        16 * scale,
+        14 * scale,
+        16 * scale,
+        10 * scale,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF1F1),
         borderRadius: BorderRadius.circular(18 * scale),
@@ -650,12 +794,17 @@ class _OptionTile extends StatelessWidget {
           onTap: onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 10 * scale),
+            padding: EdgeInsets.symmetric(
+              horizontal: 12 * scale,
+              vertical: 10 * scale,
+            ),
             decoration: BoxDecoration(
               color: isSelected ? Colors.white : const Color(0xFFFFF7F7),
               borderRadius: BorderRadius.circular(14 * scale),
               border: Border.all(
-                color: isSelected ? AppColors.mintPrimary.withValues(alpha: 0.6) : Colors.transparent,
+                color: isSelected
+                    ? AppColors.mintPrimary.withValues(alpha: 0.6)
+                    : Colors.transparent,
                 width: 1.2,
               ),
             ),
@@ -697,10 +846,7 @@ class _OptionTile extends StatelessWidget {
 }
 
 class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar({
-    required this.selectedIndex,
-    required this.onTap,
-  });
+  const _BottomNavBar({required this.selectedIndex, required this.onTap});
 
   final int selectedIndex;
   final ValueChanged<int> onTap;
@@ -788,13 +934,19 @@ class _BottomBarIcon extends StatelessWidget {
               gradient: AppColors.primaryGradient,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.blueSecondary.withValues(alpha: isActive ? 0.35 : 0.20),
+                  color: AppColors.blueSecondary.withValues(
+                    alpha: isActive ? 0.35 : 0.20,
+                  ),
                   blurRadius: (isActive ? 18 : 12) * scale,
                   offset: Offset(0, 8 * scale),
                 ),
               ],
             ),
-            child: Icon(Icons.pets_rounded, color: Colors.white, size: 30 * scale),
+            child: Icon(
+              Icons.pets_rounded,
+              color: Colors.white,
+              size: 30 * scale,
+            ),
           ),
         ),
       );
@@ -805,9 +957,14 @@ class _BottomBarIcon extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 6 * scale),
+        padding: EdgeInsets.symmetric(
+          horizontal: 8 * scale,
+          vertical: 6 * scale,
+        ),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.mintPrimary.withValues(alpha: 0.16) : Colors.transparent,
+          color: isActive
+              ? AppColors.mintPrimary.withValues(alpha: 0.16)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(14 * scale),
         ),
         child: Icon(

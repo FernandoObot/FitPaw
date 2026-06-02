@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/app_colors.dart';
 import '../../services/auth_service.dart';
@@ -20,6 +21,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final TextEditingController pesoController = TextEditingController();
   final TextEditingController estaturaController = TextEditingController();
   bool isLoading = false;
+
+  static const String _realDataMessage = 'Ponga datos reales';
 
   @override
   void initState() {
@@ -48,14 +51,27 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       return;
     }
 
-    setState(() => isLoading = true);
-
     try {
       // Convertir año a fecha (asumiendo el 1 de enero del año ingresado)
       final ano = int.parse(anoNacimientoController.text);
-      final fechaNacimiento = DateTime(ano, 1, 1);
       final peso = double.parse(pesoController.text);
       final estatura = int.parse(estaturaController.text);
+
+      if (ano < 1920 ||
+          ano > 2010 ||
+          peso < 40 ||
+          peso > 300 ||
+          estatura < 120 ||
+          estatura > 220) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text(_realDataMessage)));
+        return;
+      }
+
+      setState(() => isLoading = true);
+
+      final fechaNacimiento = DateTime(ano, 1, 1);
 
       final result = await authService.updateProfile(
         genero: generoController.text,
@@ -72,16 +88,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${result['error']}')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: ${result['error']}')));
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text(_realDataMessage)));
       }
     } finally {
       if (mounted) {
@@ -98,13 +114,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: ['Masculino', 'Femenino', 'Otro']
-              .map((genero) => ListTile(
-                    title: Text(genero),
-                    onTap: () {
-                      generoController.text = genero;
-                      Navigator.pop(context);
-                    },
-                  ))
+              .map(
+                (genero) => ListTile(
+                  title: Text(genero),
+                  onTap: () {
+                    generoController.text = genero;
+                    Navigator.pop(context);
+                  },
+                ),
+              )
               .toList(),
         ),
       ),
@@ -119,13 +137,22 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: Responsive.phoneWidth(context)),
+            constraints: BoxConstraints(
+              maxWidth: Responsive.phoneWidth(context),
+            ),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(24 * scale, 26 * scale, 24 * scale, 20 * scale),
+                  padding: EdgeInsets.fromLTRB(
+                    24 * scale,
+                    26 * scale,
+                    24 * scale,
+                    20 * scale,
+                  ),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight - (46 * scale)),
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - (46 * scale),
+                    ),
                     child: Column(
                       children: [
                         SizedBox(
@@ -138,13 +165,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                               errorBuilder: (context, error, stackTrace) {
                                 return DecoratedBox(
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(28 * scale),
+                                    borderRadius: BorderRadius.circular(
+                                      28 * scale,
+                                    ),
                                     gradient: AppColors.primaryGradient,
                                   ),
                                   child: SizedBox(
                                     width: double.infinity,
                                     height: double.infinity,
-                                    child: Icon(Icons.self_improvement_rounded, size: 118 * scale, color: Colors.white),
+                                    child: Icon(
+                                      Icons.self_improvement_rounded,
+                                      size: 118 * scale,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 );
                               },
@@ -152,9 +185,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           ),
                         ),
                         SizedBox(height: 10 * scale),
-                        Text('Completa tu perfil', style: TextStyle(fontSize: Responsive.fs(context, 24), fontWeight: FontWeight.w700)),
+                        Text(
+                          'Completa tu perfil',
+                          style: TextStyle(
+                            fontSize: Responsive.fs(context, 24),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         SizedBox(height: 8 * scale),
-                        Text('Nos ayudara a conocer mas sobre ti', style: TextStyle(fontSize: Responsive.fs(context, 13), color: AppColors.textSecondary)),
+                        Text(
+                          'Nos ayudara a conocer mas sobre ti',
+                          style: TextStyle(
+                            fontSize: Responsive.fs(context, 13),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                         SizedBox(height: 20 * scale),
                         _ProfileField(
                           controller: generoController,
@@ -169,6 +214,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           hint: 'Ano de nacimiento',
                           icon: Icons.calendar_month_outlined,
                           keyboardType: TextInputType.number,
+                          maxLength: 4,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
                         ),
                         SizedBox(height: 12 * scale),
                         _TwoMetricRow(
@@ -191,25 +240,48 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           width: double.infinity,
                           height: 56 * scale,
                           child: DecoratedBox(
-                            decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(30 * scale)),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(30 * scale),
+                            ),
                             child: ElevatedButton(
                               onPressed: isLoading ? null : _guardarPerfil,
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                              ),
                               child: isLoading
                                   ? SizedBox(
                                       height: 24 * scale,
                                       width: 24 * scale,
                                       child: CircularProgressIndicator(
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                         strokeWidth: 2,
                                       ),
                                     )
                                   : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
-                                        Text('Siguiente', style: TextStyle(color: Colors.white, fontSize: Responsive.fs(context, 18), fontWeight: FontWeight.w700)),
+                                        Text(
+                                          'Siguiente',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: Responsive.fs(
+                                              context,
+                                              18,
+                                            ),
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
                                         const SizedBox(width: 6),
-                                        const Icon(Icons.chevron_right_rounded, color: Colors.white),
+                                        const Icon(
+                                          Icons.chevron_right_rounded,
+                                          color: Colors.white,
+                                        ),
                                       ],
                                     ),
                             ),
@@ -236,6 +308,8 @@ class _ProfileField extends StatelessWidget {
     this.controller,
     this.onTap,
     this.keyboardType = TextInputType.text,
+    this.maxLength,
+    this.inputFormatters,
   });
 
   final String hint;
@@ -244,6 +318,8 @@ class _ProfileField extends StatelessWidget {
   final TextEditingController? controller;
   final VoidCallback? onTap;
   final TextInputType keyboardType;
+  final int? maxLength;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -251,12 +327,23 @@ class _ProfileField extends StatelessWidget {
       controller: controller,
       readOnly: hasDropdown,
       keyboardType: keyboardType,
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       onTap: onTap,
       decoration: InputDecoration(
+        counterText: '',
         hintText: hint,
-        hintStyle: TextStyle(color: AppColors.faintText, fontSize: Responsive.fs(context, 13)),
+        hintStyle: TextStyle(
+          color: AppColors.faintText,
+          fontSize: Responsive.fs(context, 13),
+        ),
         prefixIcon: Icon(icon, color: AppColors.faintText, size: 20),
-        suffixIcon: hasDropdown ? const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.faintText) : null,
+        suffixIcon: hasDropdown
+            ? const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: AppColors.faintText,
+              )
+            : null,
       ),
     );
   }
@@ -287,15 +374,27 @@ class _TwoMetricRow extends StatelessWidget {
             hint: left,
             icon: leftIcon,
             keyboardType: TextInputType.number,
+            maxLength: 3,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
         ),
         SizedBox(width: 10 * scale),
         Container(
           width: 56 * scale,
           height: 50 * scale,
-          decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(12 * scale)),
+          decoration: BoxDecoration(
+            gradient: AppColors.primaryGradient,
+            borderRadius: BorderRadius.circular(12 * scale),
+          ),
           alignment: Alignment.center,
-          child: Text(rightLabel, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: Responsive.fs(context, 13))),
+          child: Text(
+            rightLabel,
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: Responsive.fs(context, 13),
+            ),
+          ),
         ),
       ],
     );

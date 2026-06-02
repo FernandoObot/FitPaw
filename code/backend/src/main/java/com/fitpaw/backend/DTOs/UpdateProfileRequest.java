@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 public class UpdateProfileRequest {
 
     private String genero;
-    private Integer fechaNacimiento; // Año de nacimiento (1950-2006) o fecha ISO string
+    private Integer fechaNacimiento; // Año de nacimiento (1920-2010) o fecha ISO string
     private Double pesoActual;
     private Integer estaturaCm;
 

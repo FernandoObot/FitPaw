@@ -1,0 +1,189 @@
+digraph FitPawBackendC4Level3 {
+  graph [
+    rankdir=LR,
+    bgcolor="#f7faf7",
+    label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+        <TR><TD><FONT POINT-SIZE="24"><B>FitPaw Backend - C4 Nivel 3</B></FONT></TD></TR>
+        <TR><TD><FONT POINT-SIZE="12">Diagrama de componentes del contenedor backend Spring Boot</FONT></TD></TR>
+      </TABLE>
+    >,
+    labelloc=t,
+    pad="0.35",
+    nodesep="0.55",
+    ranksep="0.85",
+    splines=polyline,
+    outputorder=edgesfirst,
+    fontname="DejaVu Sans"
+  ];
+
+  node [
+    shape=rect,
+    style="rounded,filled",
+    fontname="DejaVu Sans",
+    fontsize=11,
+    color="#3d5a54",
+    penwidth=1.2,
+    margin="0.12,0.08"
+  ];
+
+  edge [
+    fontname="DejaVu Sans",
+    fontsize=9,
+    color="#52645f",
+    arrowsize=0.7,
+    penwidth=1.1
+  ];
+
+  mobile_app [
+    fillcolor="#dbeafe",
+    label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2">
+        <TR><TD><B>App Movil Flutter</B></TD></TR>
+        <TR><TD><FONT POINT-SIZE="9">Cliente FitPaw</FONT></TD></TR>
+      </TABLE>
+    >
+  ];
+
+  subgraph cluster_backend {
+    label="Backend FitPaw - Spring Boot";
+    labelloc=t;
+    fontsize=16;
+    fontname="DejaVu Sans";
+    color="#83a99d";
+    fillcolor="#eef7f1";
+    style="rounded,filled";
+    margin=18;
+
+    security [
+      fillcolor="#fde68a",
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2">
+          <TR><TD><B>SecurityConfig</B></TD></TR>
+          <TR><TD><FONT POINT-SIZE="9">CORS, sesiones stateless</FONT></TD></TR>
+          <TR><TD><FONT POINT-SIZE="9">JWT Authentication Filter</FONT></TD></TR>
+        </TABLE>
+      >
+    ];
+
+    jwt_util [
+      fillcolor="#fef3c7",
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2">
+          <TR><TD><B>JwtUtil</B></TD></TR>
+          <TR><TD><FONT POINT-SIZE="9">Genera y valida tokens</FONT></TD></TR>
+          <TR><TD><FONT POINT-SIZE="9">Extrae usuarioId/telefono</FONT></TD></TR>
+        </TABLE>
+      >
+    ];
+
+    subgraph cluster_api {
+      label="API REST Controllers";
+      color="#b7c9c1";
+      fillcolor="#ffffff";
+      style="rounded,filled";
+
+      auth_controller [fillcolor="#ffffff", label=< <B>AuthController</B><BR/><FONT POINT-SIZE="9">/auth register, login, profile</FONT> >];
+      exercise_controller [fillcolor="#ffffff", label=< <B>ExerciseController</B><BR/><FONT POINT-SIZE="9">/ejercicios cardio, fuerza, completar</FONT> >];
+      pet_controller [fillcolor="#ffffff", label=< <B>PetController</B><BR/><FONT POINT-SIZE="9">/pet status, feed, foods, clothing</FONT> >];
+      streak_controller [fillcolor="#ffffff", label=< <B>StreakController</B><BR/><FONT POINT-SIZE="9">/streak/info</FONT> >];
+      photos_controller [fillcolor="#ffffff", label=< <B>ProgressPhotoController</B><BR/><FONT POINT-SIZE="9">/fotos-progreso upload, list, delete</FONT> >];
+    }
+
+    subgraph cluster_services {
+      label="Casos de uso y servicios";
+      color="#b7c9c1";
+      fillcolor="#f8fffb";
+      style="rounded,filled";
+
+      auth_service [fillcolor="#dcfce7", label=< <B>AuthService</B><BR/><FONT POINT-SIZE="9">Registro, login, perfil</FONT><BR/><FONT POINT-SIZE="9">BCrypt + JWT</FONT> >];
+      exercise_service [fillcolor="#dcfce7", label=< <B>ExerciseService</B><BR/><FONT POINT-SIZE="9">Guarda/lista ejercicios</FONT><BR/><FONT POINT-SIZE="9">Marca completados</FONT> >];
+      pet_service [fillcolor="#dcfce7", label=< <B>PetService</B><BR/><FONT POINT-SIZE="9">Estado de mascota</FONT><BR/><FONT POINT-SIZE="9">Alimento, hambre, ropa</FONT> >];
+      streak_service [fillcolor="#dcfce7", label=< <B>StreakService</B><BR/><FONT POINT-SIZE="9">Consulta racha actual</FONT> >];
+      reward_service [fillcolor="#bbf7d0", label=< <B>StreakRewardService</B><BR/><FONT POINT-SIZE="9">Actualiza rachas</FONT><BR/><FONT POINT-SIZE="9">Otorga comida y atuendos</FONT> >];
+      storage_service [fillcolor="#dcfce7", label=< <B>StorageService</B><BR/><FONT POINT-SIZE="9">Valida fotos</FONT><BR/><FONT POINT-SIZE="9">Limite diario y slots</FONT> >];
+    }
+
+    subgraph cluster_data_access {
+      label="Acceso a datos";
+      color="#b7c9c1";
+      fillcolor="#ffffff";
+      style="rounded,filled";
+
+      db_provider [fillcolor="#e0f2fe", label=< <B>DatabaseConnectionProvider</B><BR/><FONT POINT-SIZE="9">Interfaz de conexion JDBC</FONT> >];
+      conexion_db [fillcolor="#e0f2fe", label=< <B>ConexionDB</B><BR/><FONT POINT-SIZE="9">DriverManager PostgreSQL</FONT><BR/><FONT POINT-SIZE="9">host/db/user/pass/port</FONT> >];
+    }
+
+    dto_model [
+      fillcolor="#f1f5f9",
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2">
+          <TR><TD><B>DTOs y Modelos</B></TD></TR>
+          <TR><TD><FONT POINT-SIZE="9">Requests/Responses</FONT></TD></TR>
+          <TR><TD><FONT POINT-SIZE="9">User, PetStatus, Racha, Photos</FONT></TD></TR>
+        </TABLE>
+      >
+    ];
+  }
+
+  supabase_db [
+    shape=cylinder,
+    fillcolor="#d1fae5",
+    label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2">
+        <TR><TD><B>Supabase PostgreSQL</B></TD></TR>
+        <TR><TD><FONT POINT-SIZE="9">usuarios_cuenta</FONT></TD></TR>
+        <TR><TD><FONT POINT-SIZE="9">ejercicio_cardio/fuerza</FONT></TD></TR>
+        <TR><TD><FONT POINT-SIZE="9">mascota_estado/alimento/ropa</FONT></TD></TR>
+        <TR><TD><FONT POINT-SIZE="9">usuarios_racha, fotos_progreso</FONT></TD></TR>
+      </TABLE>
+    >
+  ];
+
+  supabase_storage [
+    shape=folder,
+    fillcolor="#ede9fe",
+    label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2">
+        <TR><TD><B>Supabase Storage</B></TD></TR>
+        <TR><TD><FONT POINT-SIZE="9">Bucket de fotos de progreso</FONT></TD></TR>
+      </TABLE>
+    >
+  ];
+
+  mobile_app -> security [label="HTTPS JSON / Multipart"];
+  security -> jwt_util [label="valida bearer token"];
+  security -> auth_controller [label="rutas publicas y protegidas"];
+  security -> exercise_controller [label="usuarioId autenticado"];
+  security -> pet_controller [label="usuarioId autenticado"];
+  security -> streak_controller [label="usuarioId autenticado"];
+  security -> photos_controller [label="usuarioId autenticado"];
+
+  auth_controller -> auth_service [label="AuthUseCase"];
+  exercise_controller -> exercise_service [label="ExerciseUseCase"];
+  pet_controller -> pet_service [label="PetUseCase"];
+  streak_controller -> streak_service [label="StreakQueryUseCase"];
+  photos_controller -> storage_service [label="ProgressPhotoUseCase"];
+
+  auth_service -> jwt_util [label="emite token"];
+  exercise_service -> reward_service [label="completado activa racha/recompensas"];
+  pet_service -> reward_service [label="consulta/actualiza inventario"];
+  streak_service -> reward_service [label="activa racha desde cero"];
+
+  auth_service -> db_provider [label="JDBC SQL"];
+  exercise_service -> db_provider [label="JDBC SQL"];
+  pet_service -> db_provider [label="JDBC SQL"];
+  streak_service -> db_provider [label="JDBC SQL"];
+  reward_service -> db_provider [label="usa Connection compartida"];
+  storage_service -> db_provider [label="metadatos de fotos"];
+
+  db_provider -> conexion_db [label="implementacion"];
+  conexion_db -> supabase_db [label="PostgreSQL JDBC"];
+  storage_service -> supabase_storage [label="sube/elimina archivos HTTP"];
+
+  auth_controller -> dto_model [style=dashed, label="request/response"];
+  exercise_controller -> dto_model [style=dashed, label="request/response"];
+  pet_controller -> dto_model [style=dashed, label="request/response"];
+  photos_controller -> dto_model [style=dashed, label="request/response"];
+  streak_controller -> dto_model [style=dashed, label="response"];
+}

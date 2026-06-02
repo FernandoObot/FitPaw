@@ -55,7 +55,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
 
     if (!_isValidUsername(nombreCompleto)) {
-      _showSnackBar('El nombre de usuario debe tener máximo 16 letras, sin números ni símbolos.');
+      _showSnackBar(
+        'El nombre de usuario debe tener máximo 16 letras, sin números ni símbolos.',
+      );
       return;
     }
 
@@ -65,7 +67,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
 
     if (!_isValidPassword(password)) {
-      _showSnackBar('La contraseña debe tener mínimo 8 caracteres, una letra y un número.');
+      _showSnackBar(
+        'La contraseña debe tener mínimo 8 caracteres, una letra y un número.',
+      );
       return;
     }
 
@@ -79,7 +83,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
 
       if (registerResult['success'] != true) {
-        _showSnackBar(registerResult['error']?.toString() ?? 'No se pudo registrar.');
+        _showSnackBar(
+          registerResult['error']?.toString() ?? 'No se pudo registrar.',
+        );
         return;
       }
 
@@ -95,7 +101,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
           MaterialPageRoute<void>(builder: (_) => const ProfileSetupScreen()),
         );
       } else {
-        _showSnackBar('Usuario creado, pero no se pudo iniciar sesión automáticamente.');
+        _showSnackBar(
+          'Usuario creado, pero no se pudo iniciar sesión automáticamente.',
+        );
       }
     } catch (e) {
       _showSnackBar('Error inesperado: $e');
@@ -108,9 +116,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   void _showSnackBar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -121,17 +129,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: Responsive.phoneWidth(context)),
+            constraints: BoxConstraints(
+              maxWidth: Responsive.phoneWidth(context),
+            ),
             child: Padding(
-              padding: EdgeInsets.fromLTRB(24 * scale, 28 * scale, 24 * scale, 20 * scale),
+              padding: EdgeInsets.fromLTRB(
+                24 * scale,
+                28 * scale,
+                24 * scale,
+                20 * scale,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Center(
-                    child: Text('Hola,', style: TextStyle(fontSize: Responsive.fs(context, 24), color: AppColors.textSecondary)),
+                    child: Text(
+                      'Hola,',
+                      style: TextStyle(
+                        fontSize: Responsive.fs(context, 24),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ),
                   Center(
-                    child: Text('Crea una cuenta', style: TextStyle(fontSize: Responsive.fs(context, 36), fontWeight: FontWeight.w700)),
+                    child: Text(
+                      'Crea una cuenta',
+                      style: TextStyle(
+                        fontSize: Responsive.fs(context, 36),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                   SizedBox(height: 26 * scale),
                   _RegField(
@@ -140,7 +167,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     icon: Icons.person_outline_rounded,
                     maxLength: 16,
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-zÁÉÍÓÚáéíóúÑñ]')),
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'[A-Za-zÁÉÍÓÚáéíóúÑñ]'),
+                      ),
                     ],
                     textInputAction: TextInputAction.next,
                   ),
@@ -149,7 +178,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     controller: _phoneController,
                     hint: 'Numero de telefono',
                     icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
+                    keyboardType: TextInputType.number,
+                    maxLength: 10,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     textInputAction: TextInputAction.next,
                   ),
                   SizedBox(height: 12 * scale),
@@ -167,16 +198,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       Checkbox(
                         value: _terms,
                         activeColor: AppColors.mintPrimary,
-                        onChanged: (value) => setState(() => _terms = value ?? false),
+                        onChanged: (value) =>
+                            setState(() => _terms = value ?? false),
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                        visualDensity: const VisualDensity(
+                          horizontal: -4,
+                          vertical: -4,
+                        ),
                       ),
                       Expanded(
                         child: Padding(
                           padding: EdgeInsets.only(top: 4 * scale),
                           child: Text(
                             'Al continuar aceptas nuestra Politica de Privacidad y Terminos de uso',
-                            style: TextStyle(fontSize: Responsive.fs(context, 11), color: AppColors.textSecondary, height: 1.35),
+                            style: TextStyle(
+                              fontSize: Responsive.fs(context, 11),
+                              color: AppColors.textSecondary,
+                              height: 1.35,
+                            ),
                           ),
                         ),
                       ),
@@ -187,17 +226,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     width: double.infinity,
                     height: 56 * scale,
                     child: DecoratedBox(
-                      decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(30 * scale)),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(30 * scale),
+                      ),
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _handleRegister,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                        ),
                         child: _isLoading
                             ? const SizedBox(
                                 height: 22,
                                 width: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                  color: Colors.white,
+                                ),
                               )
-                            : Text('Registrate', style: TextStyle(color: Colors.white, fontSize: Responsive.fs(context, 18), fontWeight: FontWeight.w700)),
+                            : Text(
+                                'Registrate',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: Responsive.fs(context, 18),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -206,17 +261,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     child: GestureDetector(
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute<void>(builder: (_) => const SignInScreen()),
+                          MaterialPageRoute<void>(
+                            builder: (_) => const SignInScreen(),
+                          ),
                         );
                       },
                       child: RichText(
                         text: TextSpan(
-                          style: TextStyle(fontSize: Responsive.fs(context, 13), color: AppColors.textPrimary),
+                          style: TextStyle(
+                            fontSize: Responsive.fs(context, 13),
+                            color: AppColors.textPrimary,
+                          ),
                           children: [
                             const TextSpan(text: 'Ya tienes una cuenta? '),
                             TextSpan(
                               text: 'Inicia sesion',
-                              style: TextStyle(color: AppColors.blueSecondary, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                color: AppColors.blueSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),
@@ -279,14 +342,21 @@ class _RegFieldState extends State<_RegField> {
       decoration: InputDecoration(
         counterText: '',
         hintText: widget.hint,
-        hintStyle: TextStyle(color: AppColors.faintText, fontSize: Responsive.fs(context, 13)),
+        hintStyle: TextStyle(
+          color: AppColors.faintText,
+          fontSize: Responsive.fs(context, 13),
+        ),
         prefixIcon: Icon(widget.icon, color: AppColors.faintText, size: 20),
         suffixIcon: widget.obscure
             ? IconButton(
-                tooltip: _hideText ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                tooltip: _hideText
+                    ? 'Mostrar contraseña'
+                    : 'Ocultar contraseña',
                 onPressed: () => setState(() => _hideText = !_hideText),
                 icon: Icon(
-                  _hideText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  _hideText
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
                   color: AppColors.faintText,
                   size: 20,
                 ),

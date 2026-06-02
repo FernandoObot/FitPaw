@@ -17,7 +17,9 @@ class SentadillasScreen extends StatefulWidget {
 }
 
 class _SentadillasScreenState extends State<SentadillasScreen> {
-  final WorkoutScheduleService _scheduleService = WorkoutScheduleService(ApiClient());
+  final WorkoutScheduleService _scheduleService = WorkoutScheduleService(
+    ApiClient(),
+  );
   late int _selectedHour;
   late int _selectedMinute;
   late String _selectedPeriod;
@@ -27,7 +29,15 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
   String _selectedRepetitions = '8 - 12';
   String _selectedWeight = '12 kg';
 
-  static const List<String> _weekdayLabels = ['Lun', 'Mar', 'Mier', 'Juev', 'Vier', 'Sab', 'Dom'];
+  static const List<String> _weekdayLabels = [
+    'Lun',
+    'Mar',
+    'Mier',
+    'Juev',
+    'Vier',
+    'Sab',
+    'Dom',
+  ];
 
   @override
   void initState() {
@@ -50,11 +60,16 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: Responsive.phoneWidth(context)),
+            constraints: BoxConstraints(
+              maxWidth: Responsive.phoneWidth(context),
+            ),
             child: Column(
               children: [
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 12 * scale),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: 12 * scale,
+                  ),
                   child: Row(
                     children: [
                       Material(
@@ -69,7 +84,11 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(10 * scale),
                             ),
-                            child: Icon(Icons.close_rounded, color: AppColors.textPrimary, size: 20 * scale),
+                            child: Icon(
+                              Icons.close_rounded,
+                              color: AppColors.textPrimary,
+                              size: 20 * scale,
+                            ),
                           ),
                         ),
                       ),
@@ -80,7 +99,10 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                             child: Text(
                               'Horario por dia',
                               style: TextStyle(
-                                fontSize: Responsive.fs(context, isCompact ? 17 : 18),
+                                fontSize: Responsive.fs(
+                                  context,
+                                  isCompact ? 17 : 18,
+                                ),
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.textPrimary,
                               ),
@@ -94,16 +116,30 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                 ),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 6 * scale),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: 6 * scale,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(height: 6 * scale),
                         Row(
                           children: [
-                            Icon(Icons.calendar_today_outlined, color: AppColors.textSecondary, size: 18 * scale),
+                            Icon(
+                              Icons.calendar_today_outlined,
+                              color: AppColors.textSecondary,
+                              size: 18 * scale,
+                            ),
                             SizedBox(width: 8 * scale),
-                            Text(_weekdayLabels[(widget.selectedDate.weekday - 1).clamp(0, 6)], style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                            Text(
+                              _weekdayLabels[(widget.selectedDate.weekday - 1)
+                                  .clamp(0, 6)],
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                         SizedBox(height: 12 * scale),
@@ -121,31 +157,52 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                           onTap: _showTimePickerSheet,
                           child: LayoutBuilder(
                             builder: (context, constraints) {
-                              final bool ultraCompact = constraints.maxWidth < 320;
-                              final double gap = ultraCompact ? 6 * scale : 8 * scale;
+                              final bool ultraCompact =
+                                  constraints.maxWidth < 320;
+                              final double gap = ultraCompact
+                                  ? 6 * scale
+                                  : 8 * scale;
                               return Row(
                                 children: [
                                   Expanded(
                                     child: _TimeColumn(
-                                      topValue: (_selectedHour - 1).clamp(1, 12).toString(),
+                                      topValue: (_selectedHour - 1)
+                                          .clamp(1, 12)
+                                          .toString(),
                                       selectedValue: _selectedHour.toString(),
-                                      bottomValue: (_selectedHour + 1).clamp(1, 12).toString(),
+                                      bottomValue: (_selectedHour + 1)
+                                          .clamp(1, 12)
+                                          .toString(),
                                       compact: isCompact,
                                     ),
                                   ),
                                   SizedBox(width: gap),
                                   Expanded(
                                     child: _TimeColumn(
-                                      topValue: (_selectedMinute == 0 ? 59 : _selectedMinute - 1).toString().padLeft(2, '0'),
-                                      selectedValue: _selectedMinute.toString().padLeft(2, '0'),
-                                      bottomValue: (_selectedMinute == 59 ? 0 : _selectedMinute + 1).toString().padLeft(2, '0'),
+                                      topValue:
+                                          (_selectedMinute == 0
+                                                  ? 59
+                                                  : _selectedMinute - 1)
+                                              .toString()
+                                              .padLeft(2, '0'),
+                                      selectedValue: _selectedMinute
+                                          .toString()
+                                          .padLeft(2, '0'),
+                                      bottomValue:
+                                          (_selectedMinute == 59
+                                                  ? 0
+                                                  : _selectedMinute + 1)
+                                              .toString()
+                                              .padLeft(2, '0'),
                                       compact: isCompact,
                                     ),
                                   ),
                                   SizedBox(width: gap),
                                   Expanded(
                                     child: _TimeColumn(
-                                      topValue: _selectedPeriod == 'AM' ? 'PM' : 'AM',
+                                      topValue: _selectedPeriod == 'AM'
+                                          ? 'PM'
+                                          : 'AM',
                                       selectedValue: _selectedPeriod,
                                       bottomValue: '',
                                       compact: isCompact,
@@ -175,7 +232,8 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                             title: 'Dificultad',
                             current: _selectedDifficulty,
                             options: const ['Normal', 'Media', 'Baja'],
-                            onSelect: (value) => setState(() => _selectedDifficulty = value),
+                            onSelect: (value) =>
+                                setState(() => _selectedDifficulty = value),
                           ),
                         ),
                         SizedBox(height: 12 * scale),
@@ -187,8 +245,14 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                           onTap: () => _showOptionSheet(
                             title: 'Ajustar repeticiones',
                             current: _selectedRepetitions,
-                            options: const ['6 - 8', '8 - 12', '12 - 15', '15 - 20'],
-                            onSelect: (value) => setState(() => _selectedRepetitions = value),
+                            options: const [
+                              '6 - 8',
+                              '8 - 12',
+                              '12 - 15',
+                              '15 - 20',
+                            ],
+                            onSelect: (value) =>
+                                setState(() => _selectedRepetitions = value),
                           ),
                         ),
                         SizedBox(height: 12 * scale),
@@ -200,8 +264,16 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                           onTap: () => _showOptionSheet(
                             title: 'Ajustar pesos',
                             current: _selectedWeight,
-                            options: const ['5 kg', '8 kg', '10 kg', '12 kg', '15 kg', '20 kg'],
-                            onSelect: (value) => setState(() => _selectedWeight = value),
+                            options: const [
+                              '5 kg',
+                              '8 kg',
+                              '10 kg',
+                              '12 kg',
+                              '15 kg',
+                              '20 kg',
+                            ],
+                            onSelect: (value) =>
+                                setState(() => _selectedWeight = value),
                           ),
                         ),
                         SizedBox(height: 28 * scale),
@@ -210,7 +282,12 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                   ),
                 ),
                 Padding(
-                  padding: EdgeInsets.fromLTRB(horizontalPadding, 6 * scale, horizontalPadding, 18 * scale),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    6 * scale,
+                    horizontalPadding,
+                    18 * scale,
+                  ),
                   child: SizedBox(
                     width: double.infinity,
                     height: isCompact ? 54 * scale : 56 * scale,
@@ -218,9 +295,13 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                       onPressed: _isSaving ? null : _guardarPlan,
                       style: ElevatedButton.styleFrom(
                         padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28 * scale)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28 * scale),
+                        ),
                         elevation: 6 * scale,
-                        shadowColor: AppColors.blueSecondary.withValues(alpha: 0.25),
+                        shadowColor: AppColors.blueSecondary.withValues(
+                          alpha: 0.25,
+                        ),
                       ),
                       child: Ink(
                         decoration: BoxDecoration(
@@ -232,13 +313,19 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                               ? SizedBox(
                                   width: 22 * scale,
                                   height: 22 * scale,
-                                  child: const CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2.4,
+                                    color: Colors.white,
+                                  ),
                                 )
                               : Text(
                                   'Guardar',
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: Responsive.fs(context, isCompact ? 15 : 16),
+                                    fontSize: Responsive.fs(
+                                      context,
+                                      isCompact ? 15 : 16,
+                                    ),
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -267,11 +354,12 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
       }
 
       // VALIDACIÓN: Verificar conflictos antes de guardar
-      final String? conflictError = await _scheduleService.checkExerciseConflicts(
-        nombreEjercicio: 'Sentadillas',
-        fecha: widget.selectedDate,
-        hora: hour24,
-      );
+      final String? conflictError = await _scheduleService
+          .checkExerciseConflicts(
+            nombreEjercicio: 'Sentadillas',
+            fecha: widget.selectedDate,
+            hora: hour24,
+          );
 
       if (conflictError != null) {
         if (!mounted) return;
@@ -289,7 +377,9 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
       // Extraer repeticiones (ej. "8 - 12" → tomar máximo)
       int repeticiones;
       try {
-        repeticiones = int.parse(RegExp(r'\d+').firstMatch(_selectedRepetitions)!.group(0)!);
+        repeticiones = int.parse(
+          RegExp(r'\d+').firstMatch(_selectedRepetitions)!.group(0)!,
+        );
       } catch (e) {
         repeticiones = 0; // fallback si no encuentra número
       }
@@ -312,18 +402,6 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
         return;
       }
 
-      final Map<String, dynamic> newlySavedExercise = {
-        'nombre': 'Sentadillas',
-        'tipo': 'fuerza',
-        'grupo_muscular': 'Piernas',
-        'dificultad': _difficultyToInt(_selectedDifficulty),
-        'repeticiones': repeticiones,
-        'peso': peso,
-        'fecha': widget.selectedDate.toString().split(' ')[0],
-        'hora': hour24,
-        'completado': false,
-      };
-
       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => TrainingScheduleScreen(
@@ -331,7 +409,6 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
             exerciseSubtitle: '3 series de 15 reps',
             exerciseIcon: Icons.directions_run_rounded,
             initialSelectedDate: widget.selectedDate,
-            newlySavedExercise: newlySavedExercise,
           ),
         ),
         (_) => false,
@@ -341,26 +418,13 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo guardar: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('No se pudo guardar: $error')));
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
       }
-    }
-  }
-
-  int _difficultyToInt(String difficulty) {
-    switch (difficulty.toLowerCase()) {
-      case 'baja':
-        return 1;
-      case 'media':
-        return 2;
-      case 'alta':
-        return 3;
-      default:
-        return 2;
     }
   }
 
@@ -372,7 +436,10 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
       String period = i >= 12 ? 'PM' : 'AM';
       hours.add('$hour12 $period');
     }
-    final List<String> minutes = List.generate(60, (i) => i.toString().padLeft(2, '0'));
+    final List<String> minutes = List.generate(
+      60,
+      (i) => i.toString().padLeft(2, '0'),
+    );
 
     // Convertir hora actual (12h con período) a índice en la lista 6-20
     int currentHour24h = _selectedHour;
@@ -392,7 +459,9 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       constraints: BoxConstraints(maxWidth: Responsive.phoneWidth(context)),
       builder: (context) {
         final double scale = Responsive.scale(context);
@@ -405,19 +474,27 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                 child: Column(
                   children: [
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16 * scale,
+                        vertical: 8 * scale,
+                      ),
                       child: Row(
                         children: [
-                          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancelar'),
+                          ),
                           const Spacer(),
                           TextButton(
                             onPressed: () {
                               // Convertir índice (0-14) a hora 24h (6-20)
                               int hour24h = selectedHourIndex + 6;
                               // Convertir a formato 12h con período
-                              int hour12 = hour24h > 12 ? hour24h - 12 : (hour24h == 0 ? 12 : hour24h);
+                              int hour12 = hour24h > 12
+                                  ? hour24h - 12
+                                  : (hour24h == 0 ? 12 : hour24h);
                               String period = hour24h >= 12 ? 'PM' : 'AM';
-                              
+
                               setState(() {
                                 _selectedHour = hour12;
                                 _selectedMinute = selectedMinute;
@@ -436,17 +513,46 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                           Expanded(
                             child: CupertinoPicker(
                               itemExtent: 36 * scale,
-                              scrollController: FixedExtentScrollController(initialItem: selectedHourIndex),
-                              onSelectedItemChanged: (index) => setModalState(() => selectedHourIndex = index),
-                              children: hours.map((value) => Center(child: Text(value, style: TextStyle(fontSize: Responsive.fs(context, 18))))).toList(),
+                              scrollController: FixedExtentScrollController(
+                                initialItem: selectedHourIndex,
+                              ),
+                              onSelectedItemChanged: (index) => setModalState(
+                                () => selectedHourIndex = index,
+                              ),
+                              children: hours
+                                  .map(
+                                    (value) => Center(
+                                      child: Text(
+                                        value,
+                                        style: TextStyle(
+                                          fontSize: Responsive.fs(context, 18),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
                             ),
                           ),
                           Expanded(
                             child: CupertinoPicker(
                               itemExtent: 36 * scale,
-                              scrollController: FixedExtentScrollController(initialItem: selectedMinute),
-                              onSelectedItemChanged: (index) => setModalState(() => selectedMinute = index),
-                              children: minutes.map((value) => Center(child: Text(value, style: TextStyle(fontSize: Responsive.fs(context, 18))))).toList(),
+                              scrollController: FixedExtentScrollController(
+                                initialItem: selectedMinute,
+                              ),
+                              onSelectedItemChanged: (index) =>
+                                  setModalState(() => selectedMinute = index),
+                              children: minutes
+                                  .map(
+                                    (value) => Center(
+                                      child: Text(
+                                        value,
+                                        style: TextStyle(
+                                          fontSize: Responsive.fs(context, 18),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
                             ),
                           ),
                         ],
@@ -473,7 +579,9 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       constraints: BoxConstraints(maxWidth: Responsive.phoneWidth(context)),
       builder: (context) {
         final double scale = Responsive.scale(context);
@@ -482,7 +590,12 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxHeight),
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16 * scale, 14 * scale, 16 * scale, 20 * scale),
+              padding: EdgeInsets.fromLTRB(
+                16 * scale,
+                14 * scale,
+                16 * scale,
+                20 * scale,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -504,7 +617,12 @@ class _SentadillasScreenState extends State<SentadillasScreen> {
                             (option) => ListTile(
                               contentPadding: EdgeInsets.zero,
                               title: Text(option),
-                              trailing: option == current ? Icon(Icons.check_rounded, color: AppColors.mintPrimary) : null,
+                              trailing: option == current
+                                  ? Icon(
+                                      Icons.check_rounded,
+                                      color: AppColors.mintPrimary,
+                                    )
+                                  : null,
                               onTap: () {
                                 onSelect(option);
                                 Navigator.pop(context);
@@ -543,7 +661,13 @@ class _TimeColumn extends StatelessWidget {
 
     return Column(
       children: [
-        Text(topValue, style: TextStyle(color: AppColors.textSecondary, fontSize: (compact ? 11 : 12) * scale)),
+        Text(
+          topValue,
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: (compact ? 11 : 12) * scale,
+          ),
+        ),
         SizedBox(height: 6 * scale),
         Container(
           height: (compact ? 48 : 52) * scale,
@@ -556,7 +680,10 @@ class _TimeColumn extends StatelessWidget {
               fit: BoxFit.scaleDown,
               child: Text(
                 selectedValue,
-                style: TextStyle(fontSize: (compact ? 18 : 20) * scale, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  fontSize: (compact ? 18 : 20) * scale,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
@@ -564,7 +691,13 @@ class _TimeColumn extends StatelessWidget {
         SizedBox(height: 6 * scale),
         SizedBox(
           height: 16 * scale,
-          child: Text(bottomValue, style: TextStyle(color: AppColors.textSecondary, fontSize: (compact ? 11 : 12) * scale)),
+          child: Text(
+            bottomValue,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: (compact ? 11 : 12) * scale,
+            ),
+          ),
         ),
       ],
     );
@@ -596,7 +729,10 @@ class _DetailCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14 * scale),
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 14 * scale),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12 * scale,
+            vertical: 14 * scale,
+          ),
           decoration: BoxDecoration(
             color: const Color(0xFFF6F4F7),
             borderRadius: BorderRadius.circular(14 * scale),
@@ -610,7 +746,11 @@ class _DetailCard extends StatelessWidget {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12 * scale),
                 ),
-                child: Icon(icon, color: AppColors.textSecondary, size: (compact ? 18 : 20) * scale),
+                child: Icon(
+                  icon,
+                  color: AppColors.textSecondary,
+                  size: (compact ? 18 : 20) * scale,
+                ),
               ),
               SizedBox(width: 12 * scale),
               Expanded(

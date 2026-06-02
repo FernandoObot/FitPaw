@@ -19,7 +19,6 @@ class TrainingScheduleScreen extends StatefulWidget {
   final String exerciseSubtitle;
   final IconData exerciseIcon;
   final DateTime? initialSelectedDate;
-  final Map<String, dynamic>? newlySavedExercise;
 
   const TrainingScheduleScreen({
     super.key,
@@ -27,7 +26,6 @@ class TrainingScheduleScreen extends StatefulWidget {
     required this.exerciseSubtitle,
     required this.exerciseIcon,
     this.initialSelectedDate,
-    this.newlySavedExercise,
   });
 
   @override
@@ -109,16 +107,6 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     _currentMonth = DateTime(now.year, now.month, 1);
     _now = now;
 
-    debugPrint(
-      '🔵 TrainingScheduleScreen initState - newlySavedExercise=${widget.newlySavedExercise}',
-    );
-
-    // Procesar newlySavedExercise INMEDIATAMENTE (UI optimista antes de que cargue desde BD)
-    if (widget.newlySavedExercise != null) {
-      _processNewlySavedExercise();
-    }
-
-    // Luego cargar desde la BD (la fuente de verdad)
     _loadExercisePlan();
 
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
@@ -145,67 +133,6 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     super.dispose();
   }
 
-  void _processNewlySavedExercise() {
-    if (widget.newlySavedExercise == null) return;
-
-    try {
-      final Map<String, dynamic> row = widget.newlySavedExercise!;
-      final String nombre = (row['nombre'] as String?) ?? 'Ejercicio';
-      final int hora = (row['hora'] is num) ? (row['hora'] as num).toInt() : 9;
-      final bool completado = (row['completado'] as bool?) ?? false;
-
-      String dificultadLabel = 'Media';
-      final Object? dif = row['dificultad'];
-      if (dif is num) {
-        final int dv = (dif as num).toInt();
-        if (dv == 1)
-          dificultadLabel = 'Baja';
-        else if (dv == 3)
-          dificultadLabel = 'Alta';
-        else
-          dificultadLabel = 'Media';
-      } else if (dif is String) {
-        dificultadLabel = dif;
-      }
-
-      String repetitionsLabel = '';
-      String weightLabel = '';
-
-      final String tipo = (row['tipo'] as String?) ?? 'cardio';
-      if (tipo == 'cardio') {
-        final Object? tiempo = row['tiempo_minutos'];
-        repetitionsLabel = (tiempo != null) ? '${tiempo.toString()} min' : '';
-      } else {
-        final Object? reps = row['repeticiones'];
-        final Object? peso = row['peso'];
-        repetitionsLabel = (reps != null) ? reps.toString() : '';
-        weightLabel = (peso != null) ? '${peso.toString()} kg' : '';
-      }
-
-      final int hour12 = (hora % 12 == 0) ? 12 : hora % 12;
-      final String period = hora >= 12 ? 'PM' : 'AM';
-
-      final ExercisePlan newExercise = ExercisePlan(
-        weekday: _selectedDate.weekday,
-        hour: hour12,
-        minute: 0,
-        period: period,
-        difficulty: dificultadLabel,
-        repetitions: repetitionsLabel.isNotEmpty ? repetitionsLabel : '0',
-        weight: weightLabel,
-        exerciseName: nombre,
-        completed: completado,
-      );
-
-      _ejercicios[nombre] = newExercise;
-      debugPrint(
-        '✨ INMEDIATO en initState: Ejercicio añadido al mapa: $nombre -> ${newExercise.summaryLabel}',
-      );
-    } catch (e) {
-      debugPrint('❌ ERROR en _processNewlySavedExercise: $e');
-    }
-  }
-
   Future<void> _loadExercisePlan({DateTime? forDate}) async {
     final date = forDate ?? _selectedDate;
 
@@ -214,10 +141,8 @@ class _TrainingScheduleScreenState extends State<TrainingScheduleScreen> {
     setState(() => _isLoadingSentadillas = true);
 
     try {
-      // En cambios de fecha se empieza limpio para no arrastrar ejercicios de otro dia.
-      Map<String, ExercisePlan> nuevosEjercicios = forDate == null
-          ? Map.from(_ejercicios)
-          : {};
+      // La BD es la fuente de verdad: no pintar ejercicios optimistas.
+      Map<String, ExercisePlan> nuevosEjercicios = {};
 
       // ✅ ÚNICA FUENTE: Cargar ejercicios guardados por fecha (cardio + fuerza)
       try {

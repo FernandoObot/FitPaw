@@ -29,6 +29,8 @@ import com.fitpaw.backend.util.JwtUtil;
 @Service
 public class AuthService implements AuthUseCase {
 
+    private static final String REAL_DATA_MESSAGE = "Ponga datos reales";
+
     private static final Pattern PHONE_10_DIGITS = Pattern.compile("^\\d{10}$");
     private static final Pattern USERNAME = Pattern.compile("^[A-Za-zÁÉÍÓÚáéíóúÑñ]{1,16}$");
     private static final Pattern PASSWORD_LETTER = Pattern.compile(".*[A-Za-z].*");
@@ -205,7 +207,13 @@ public class AuthService implements AuthUseCase {
             throw new IllegalArgumentException("El body del perfil es obligatorio");
         }
 
+        validarPerfilReal(
+                request.getFechaNacimiento(),
+                request.getPesoActual(),
+                request.getEstaturaCm());
+
         try (Connection conn = conexionDB.conectar()) {
+            ensureProfileConstraints(conn);
             String updateSql = "UPDATE public.usuarios_cuenta SET genero = ?, fecha_nacimiento = ?, peso_actual = ?, estatura_cm = ? WHERE usuario_id = ?";
             try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
                 ps.setString(1, request.getGenero());
@@ -246,11 +254,13 @@ public class AuthService implements AuthUseCase {
         }
 
         if (request.getPeso() != null) {
+            validarPesoReal(request.getPeso());
             sb.append("peso_actual = ?, ");
             params.add(request.getPeso());
         }
 
         if (request.getEstatura() != null) {
+            validarEstaturaReal(request.getEstatura());
             sb.append("estatura_cm = ?, ");
             params.add(request.getEstatura());
         }
@@ -289,6 +299,45 @@ public class AuthService implements AuthUseCase {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Error al editar el perfil: " + e.getMessage());
+        }
+    }
+
+    private void validarPerfilReal(Integer fechaNacimiento, Double peso, Integer estatura) {
+        if (fechaNacimiento == null || peso == null || estatura == null) {
+            throw new IllegalArgumentException(REAL_DATA_MESSAGE);
+        }
+        validarAnoNacimientoReal(fechaNacimiento);
+        validarPesoReal(peso);
+        validarEstaturaReal(estatura);
+    }
+
+    private void validarAnoNacimientoReal(Integer ano) {
+        if (ano == null || ano < 1920 || ano > 2010) {
+            throw new IllegalArgumentException(REAL_DATA_MESSAGE);
+        }
+    }
+
+    private void validarPesoReal(Double peso) {
+        if (peso == null || peso < 40 || peso > 300) {
+            throw new IllegalArgumentException(REAL_DATA_MESSAGE);
+        }
+    }
+
+    private void validarEstaturaReal(Integer estatura) {
+        if (estatura == null || estatura < 120 || estatura > 220) {
+            throw new IllegalArgumentException(REAL_DATA_MESSAGE);
+        }
+    }
+
+    private void ensureProfileConstraints(Connection conn) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "ALTER TABLE public.usuarios_cuenta DROP CONSTRAINT IF EXISTS usuarios_cuenta_fecha_nacimiento_check")) {
+            ps.execute();
+        }
+        try (PreparedStatement ps = conn.prepareStatement(
+                "ALTER TABLE public.usuarios_cuenta ADD CONSTRAINT usuarios_cuenta_fecha_nacimiento_check "
+                        + "CHECK (fecha_nacimiento >= 1920 AND fecha_nacimiento <= 2010)")) {
+            ps.execute();
         }
     }
 
